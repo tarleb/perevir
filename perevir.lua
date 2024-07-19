@@ -52,19 +52,19 @@ local is_output_code = function (codeblock)
 end
 
 --- Test object for transformation tests.
-local ConversionTest = {}
-ConversionTest.new = function (filepath)
-  return setmetatable({}, {__index = ConversionTest})
+local Test = {}
+Test.new = function (filepath)
+  return setmetatable({}, {__index = Test})
 end
-ConversionTest.from_file = function (filepath)
-  local input, expected, options = nil, nil, {}
+Test.from_file = function (filepath)
+  local input, output, options = nil, nil, {}
   local filecontents = select(2, mediabag.fetch(filepath))
   local doc = pandoc.read(filecontents):walk{
     CodeBlock = function (cb)
       if cb.identifier:match'^in' or cb.classes[1] == 'markdown' then
         input = cb.text
       elseif is_output_code(cb) then
-        expected = cb.text
+        output = cb.text
       elseif cb.identifier == 'options' or cb.classes:includes 'lua' then
         local ok, thunk = pcall(load, cb.text)
         if ok then
@@ -76,11 +76,13 @@ ConversionTest.from_file = function (filepath)
     end
   }
   return {
-    doc = doc,
-    filepath = filepath,
-    input = input .. '\n',  -- pandoc gobbles the final newline
-    expected = expected,
-    options = options,
+    filepath = filepath,       -- path to the test file
+    doc      = doc,            -- the full test document (Pandoc)
+    options  = options,        -- test options
+    input    = input .. '\n',  -- pandoc gobbles the final newline
+    output   = output,         -- expected string output
+    actual   = false,          -- actual conversion result (Pandoc|false)
+    expected = false,          -- expected document result (Pandoc|false)
   }
 end
 
@@ -89,7 +91,10 @@ end
 local TestRunner = {}
 
 --- Accept the actual document as correct and rewrite the test file.
-TestRunner.accept = function (filename, testdoc, actual)
+TestRunner.accept = function (test)
+  local actual = test.actual
+  local filename = test.filepath
+  local testdoc = test.doc
   local writer_opts = {}
   if next(actual.meta) then
     -- has metadata, use template
@@ -115,15 +120,17 @@ TestRunner.accept = function (filename, testdoc, actual)
 end
 
 --- Report a test failure
-TestRunner.report_failure = function (filepath, actual, expected)
+TestRunner.report_failure = function (test)
   local opts = {}
-  if next(actual.meta) or next(expected.meta) then
+  assert(test.actual, "The actual result is missing from the test object")
+  assert(test.expected, "The expected result is missing from the test object")
+  if next(test.actual.meta) or (next(test.expected.meta)) then
     -- has metadata, use template
     opts.template = pandoc.template.default 'native'
   end
-  local actual_str = pandoc.write(actual, 'native', opts)
-  local expected_str = pandoc.write(expected, 'native', opts)
-  io.stderr:write('Failed: ' .. filepath .. '\n')
+  local actual_str   = pandoc.write(test.actual, 'native', opts)
+  local expected_str = pandoc.write(test.expected, 'native', opts)
+  io.stderr:write('Failed: ' .. test.filepath .. '\n')
   io.stderr:write('Expected:\n')
   io.stderr:write(expected_str)
   io.stderr:write('\n\n')
@@ -134,26 +141,28 @@ end
 --- Run the test in the given file.
 function M.run_test_file (reader, filepath, accept)
   local testfile = assert(filepath, "test file required")
-  local test = ConversionTest.from_file(testfile)
+  local test = Test.from_file(testfile)
 
   assert(test.input, 'No input found in test file ' .. test.filepath)
   assert(
-    accept or test.expected,
+    accept or test.output,
     'No expected output found in test file ' .. test.filepath
   )
 
-  local actual_doc = reader(test.input .. '\n')
-  local ok, expected_doc = pcall(pandoc.read, test.expected, 'native')
+  test.actual = reader(test.input .. '\n')
+  local ok, expected_doc = pcall(pandoc.read, test.output, 'native')
 
-  if ok and actual_doc == expected_doc then
+  if ok and test.actual == expected_doc then
     return true
   elseif accept then
-    TestRunner.accept(filepath, test.doc, actual_doc)
+    test.expected = expected_doc
+    TestRunner.accept(test)
     return true
   elseif not ok then
-    io.stderr:write('Could not parse expected doc: \n' .. test.expected .. '\n')
+    io.stderr:write('Could not parse expected doc: \n' .. test.output .. '\n')
   else
-    TestRunner.report_failure(filepath, actual_doc, expected_doc)
+    test.expected = expected_doc
+    TestRunner.report_failure(test)
     return false
   end
 end
