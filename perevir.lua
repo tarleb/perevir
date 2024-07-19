@@ -110,9 +110,23 @@ end
 
 --- The test runner
 local TestRunner = {}
+TestRunner.__index = TestRunner
+
+TestRunner.reader = function (input, opts)
+  return pandoc.read(input, 'markdown', opts)
+end
+
+function TestRunner.new (opts)
+  opts = opts or {}
+  local newtr = {
+    reader = opts.reader
+  }
+  return setmetatable(newtr, TestRunner)
+end
 
 --- Accept the actual document as correct and rewrite the test file.
-TestRunner.accept = function (test)
+TestRunner.accept = function (self, test, test_factory)
+  test_factory = test_factory or TestParser.new()
   local actual = test.actual
   local filename = test.filepath
   local testdoc = test.doc
@@ -125,7 +139,7 @@ TestRunner.accept = function (test)
   local found_outblock = false
   testdoc = testdoc:walk{
     CodeBlock = function (cb)
-      if is_output_code(cb) then
+      if test_factory.is_output(cb) then
         found_outblock = true
         cb.text = actual_str
         return cb
@@ -160,7 +174,7 @@ TestRunner.report_failure = function (test)
 end
 
 --- Run the test in the given file.
-function M.run_test_file (reader, filepath, accept)
+TestRunner.run_test_file = function (self, filepath, accept)
   local testfile = assert(filepath, "test file required")
   local testparser = TestParser.new()
   local test = testparser:create_test(testfile)
@@ -171,14 +185,14 @@ function M.run_test_file (reader, filepath, accept)
     'No expected output found in test file ' .. test.filepath
   )
 
-  test.actual = reader(test.input .. '\n')
+  test.actual = self.reader(test.input .. '\n')
   local ok, expected_doc = pcall(pandoc.read, test.output, 'native')
 
   if ok and test.actual == expected_doc then
     return true
   elseif accept then
     test.expected = expected_doc
-    TestRunner.accept(test)
+    self:accept(test)
     return true
   elseif not ok then
     io.stderr:write('Could not parse expected doc: \n' .. test.output .. '\n')
@@ -190,6 +204,7 @@ function M.run_test_file (reader, filepath, accept)
 end
 
 function M.test_files_in_dir(reader, source, accept)
+  local runner = TestRunner.new()
   local success = true
   local is_dir, dirfiles = pcall(system.list_directory, source)
   local testfiles = pandoc.List{}
@@ -201,7 +216,7 @@ function M.test_files_in_dir(reader, source, accept)
   end
 
   for _, testfile in ipairs(testfiles) do
-    success = success and M.run_test_file(reader, testfile, accept)
+    success = runner:run_test_file(testfile, accept) and success
   end
 
   os.exit(success and 0 or 1)
