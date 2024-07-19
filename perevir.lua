@@ -43,49 +43,70 @@ function M.parse_args (args)
 end
 
 
+--- Test factory.
 local TestParser = {}
+TestParser.__index = TestParser
 
---- Checks whether a pandoc CodeBlock element contains the expected output.
-local is_output_code = function (codeblock)
-  return codeblock.identifier:match '^out'
-    or codeblock.identifier == 'expected'
+-- Creates a new TestParser object..
+function TestParser.new (opts)
+  opts = opts or {}
+  local newtp = {
+    is_output = opts.is_output,
+    is_input  = opts.is_input,
+    reader    = opts.reader,
+  }
+  return setmetatable(newtp, TestParser)
 end
 
---- Test object for transformation tests.
-local Test = {}
-Test.new = function (filepath)
-  return setmetatable({}, {__index = Test})
+--- Checks whether a pandoc Block element contains the expected output.
+function TestParser.is_output (block)
+  return block.identifier
+    and block.identifier:match '^out'
+    or block.identifier == 'expected'
 end
-Test.from_file = function (filepath)
-  local input, output, options = nil, nil, {}
-  local filecontents = select(2, mediabag.fetch(filepath))
-  local doc = pandoc.read(filecontents):walk{
+
+--- Checks whether a pandoc Block element contains the input.
+function TestParser.is_input (block)
+  return block.identifier:match'^in'
+end
+
+--- Parses a test file into a Pandoc object.
+function TestParser.reader (text, opts)
+  return pandoc.read(text, 'markdown', opts)
+end
+
+--- Get the code blocks that define the tests
+function TestParser:get_test_blocks (doc)
+  local input, output = nil, nil
+
+  doc:walk{
     CodeBlock = function (cb)
-      if cb.identifier:match'^in' or cb.classes[1] == 'markdown' then
-        input = cb.text
-      elseif is_output_code(cb) then
-        output = cb.text
-      elseif cb.identifier == 'options' or cb.classes:includes 'lua' then
-        local ok, thunk = pcall(load, cb.text)
-        if ok then
-          options = thunk()
-        else
-          warn('Error parsing options: ', thunk)
-        end
+      if self.is_input(cb) then
+        input = cb
+      elseif self.is_output(cb) then
+        output = cb
       end
     end
   }
+
+  return input, output
+end
+
+--- Generates a new test object from the given file.
+function TestParser:create_test (filepath)
+  local text = select(2, mediabag.fetch(filepath))
+  local doc = self.reader(text)
+  local input, output = self:get_test_blocks(doc)
   return {
     filepath = filepath,       -- path to the test file
+    text     = text,           -- full text for this test
     doc      = doc,            -- the full test document (Pandoc)
-    options  = options,        -- test options
-    input    = input .. '\n',  -- pandoc gobbles the final newline
-    output   = output,         -- expected string output
+    input    = input.text .. '\n',  -- pandoc gobbles the final newline
+    output   = output.text,    -- expected string output
     actual   = false,          -- actual conversion result (Pandoc|false)
     expected = false,          -- expected document result (Pandoc|false)
   }
 end
-
 
 --- The test runner
 local TestRunner = {}
@@ -141,7 +162,8 @@ end
 --- Run the test in the given file.
 function M.run_test_file (reader, filepath, accept)
   local testfile = assert(filepath, "test file required")
-  local test = Test.from_file(testfile)
+  local testparser = TestParser.new()
+  local test = testparser:create_test(testfile)
 
   assert(test.input, 'No input found in test file ' .. test.filepath)
   assert(
