@@ -83,10 +83,10 @@ function TestParser:get_test_blocks (doc)
   local blocks = {}
 
   local function set (kind, block)
-    if blocks[var] then
+    if blocks[kind] then
       error('Found two potential ' .. kind .. ' blocks, bailing out.')
     else
-      blocks[var] = block
+      blocks[kind] = block
     end
   end
 
@@ -218,14 +218,15 @@ Perevirka.runner = TestRunner.new()
 Perevirka.test_parser = TestParser.new()
 Perevirka.new = function (opts)
   local perevirka = {}
+  perevirka.accept = opts.accept
   perevirka.runner = opts.runner
   perevirka.test_parser = opts.test_parser
-  return setmetatable({}, Perevirka)
+  return setmetatable(perevirka, Perevirka)
 end
 
 function Perevirka:test_file (filepath)
   assert(filepath, "test file required")
-  local test = self.test_parser:create_test(testfile)
+  local test = self.test_parser:create_test(filepath)
   return self.runner:run_test(test, self.accept)
 end
 
