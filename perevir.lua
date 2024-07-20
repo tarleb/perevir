@@ -13,6 +13,8 @@ local pandoc   = require 'pandoc'
 local mediabag = require 'pandoc.mediabag'
 local path     = require 'pandoc.path'
 local system   = require 'pandoc.system'
+local template = require 'pandoc.template'
+local utils    = require 'pandoc.utils'
 
 --- Command line arguments; only set when invoked as a script.
 local arg = arg
@@ -112,6 +114,7 @@ function TestParser:create_test (filepath)
     filepath = filepath,       -- path to the test file
     text     = text,           -- full text for this test
     doc      = doc,            -- the full test document (Pandoc)
+    options  = doc.meta.perevir or {}, -- test options
     input    = input.text .. '\n',  -- pandoc gobbles the final newline
     output   = output.text,    -- expected string output
     actual   = false,          -- actual conversion result (Pandoc|false)
@@ -160,8 +163,9 @@ TestRunner.accept = function (self, test, test_factory)
   if not found_outblock then
     doc.blocks:insert(pandoc.CodeBlock(actual_str, {'expected'}))
   end
+  local md_writer_opts = {template = template.default 'markdown'}
   local fh = io.open(filename, 'w')
-  fh:write(pandoc.write(testdoc, 'markdown'))
+  fh:write(pandoc.write(testdoc, 'markdown', md_writer_opts))
   fh:close()
 end
 
@@ -193,6 +197,11 @@ TestRunner.run_test = function (self, test, accept)
   )
 
   test.actual = self.reader(test.input .. '\n')
+
+  for i, filter in ipairs(test.options.filters or {}) do
+    test.actual = utils.run_lua_filter(test.actual, utils.stringify(filter))
+  end
+
   local ok, expected_doc = pcall(pandoc.read, test.output, 'native')
 
   if ok and test.actual == expected_doc then
