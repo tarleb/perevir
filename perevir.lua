@@ -77,19 +77,27 @@ end
 
 --- Get the code blocks that define the tests
 function TestParser:get_test_blocks (doc)
-  local input, output = nil, nil
+  local blocks = {}
+
+  local function set (kind, block)
+    if blocks[var] then
+      error('Found two potential ' .. kind .. ' blocks, bailing out.')
+    else
+      blocks[var] = block
+    end
+  end
 
   doc:walk{
     CodeBlock = function (cb)
       if self.is_input(cb) then
-        input = cb
+        set('input', cb)
       elseif self.is_output(cb) then
-        output = cb
+        set('output', cb)
       end
-    end
+    end,
   }
 
-  return input, output
+  return blocks.input, blocks.output
 end
 
 --- Generates a new test object from the given file.
