@@ -1,8 +1,9 @@
 --- Command line arguments
 local arg = arg
-local pandoc  = require 'pandoc'
 local perevir = require 'perevir'
 
-local Reader = pandoc.read
 local opts = perevir.parse_args(arg)
-perevir.do_checks(Reader, opts)
+local perevirka = perevir.Perevirka.new{
+  accept = opts.accept
+}
+perevirka:test_files_in_dir(opts.path)

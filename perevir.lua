@@ -13,6 +13,7 @@ local pandoc   = require 'pandoc'
 local mediabag = require 'pandoc.mediabag'
 local path     = require 'pandoc.path'
 local system   = require 'pandoc.system'
+local structure= require 'pandoc.structure'
 local template = require 'pandoc.template'
 local utils    = require 'pandoc.utils'
 
@@ -72,7 +73,9 @@ end
 
 --- Checks whether a pandoc Block element contains the input.
 function TestParser.is_input (block)
-  return block.identifier:match'^in'
+  return block.identifier
+    and block.identifier:match'^input$'
+    or block.identifier:match'^in$'
 end
 
 --- Parses a test file into a Pandoc object.
@@ -92,7 +95,7 @@ function TestParser:get_test_blocks (doc)
     end
   end
 
-  doc:walk{
+  structure.make_sections(doc):walk{
     CodeBlock = function (cb)
       if self.is_input(cb) then
         set('input', cb)
@@ -100,8 +103,20 @@ function TestParser:get_test_blocks (doc)
         set('output', cb)
       end
     end,
+    Div = function (div)
+      if self.is_input(div) then
+        set('input', div)
+      elseif self.is_output(div) then
+        set('output', div)
+      end
+    end,
   }
 
+  if blocks.input.t == 'Div' and blocks.input.classes[1] == 'section' then
+    local section = blocks.input:clone()
+    section.content:remove(1)
+    blocks.input = section
+  end
   return blocks.input, blocks.output
 end
 
@@ -115,8 +130,8 @@ function TestParser:create_test (filepath)
     text     = text,           -- full text for this test
     doc      = doc,            -- the full test document (Pandoc)
     options  = doc.meta.perevir or {}, -- test options
-    input    = input.text .. '\n',  -- pandoc gobbles the final newline
-    output   = output.text,    -- expected string output
+    input    = input,          -- input code block or div
+    output   = output,         -- expected string output
     actual   = false,          -- actual conversion result (Pandoc|false)
     expected = false,          -- expected document result (Pandoc|false)
   }
@@ -126,8 +141,14 @@ end
 local TestRunner = {}
 TestRunner.__index = TestRunner
 
-TestRunner.reader = function (input, opts)
-  return pandoc.read(input, 'markdown', opts)
+TestRunner.reader = function (block, opts)
+  if block.t == 'CodeBlock' then
+    local format = block.classes[1] or 'markdown'
+    local exts = block.attributes.extensions or ''
+    -- pandoc gobbles the final newline in code blocks
+    return pandoc.read(block.text .. '\n', format .. exts, opts)
+  end
+  return pandoc.Pandoc(block.content)
 end
 
 function TestRunner.new (opts)
@@ -196,13 +217,23 @@ TestRunner.run_test = function (self, test, accept)
     'No expected output found in test file ' .. test.filepath
   )
 
-  test.actual = self.reader(test.input .. '\n')
+  test.actual = self.reader(test.input)
 
   for i, filter in ipairs(test.options.filters or {}) do
     test.actual = utils.run_lua_filter(test.actual, utils.stringify(filter))
   end
 
-  local ok, expected_doc = pcall(pandoc.read, test.output, 'native')
+  local output = test.output
+  local ok, expected_doc = true, pandoc.Pandoc(output)
+  if output.t == 'CodeBlock' then
+    ok, expected_doc = pcall(pandoc.read, output.text, 'native')
+  elseif output.t == 'Div' and output.classes[1] == 'section' then
+    local section_content = output.content:clone()
+    section_content:remove(1)
+    expected_doc = pandoc.Pandoc(section_content)
+  elseif output.t == 'Div' then
+    expected_doc = pandoc.Pandoc(output.content)
+  end
 
   if ok and test.actual == expected_doc then
     return true
@@ -258,9 +289,9 @@ function Perevirka:test_files_in_dir (filepath)
 end
 
 --- Perform tests on the files given in `opts.path`.
-function M.do_checks(reader, opts)
+function M.do_checks(opts)
   local perevirka = Perevirka.new {
-    runner = TestRunner.new{reader = reader},
+    runner = opts.runner or TestRunner.new(),
     accept = opts.accept,
   }
   return perevirka:test_files_in_dir(opts.path)
@@ -272,9 +303,8 @@ M.TestRunner = TestRunner
 
 -- Run the default tests when the file is called as a script.
 if not pcall(debug.getlocal, 4, 1) then
-  local Reader = pandoc.read
   local opts = M.parse_args(arg)
-  M.do_checks(Reader, opts)
+  M.do_checks(opts)
 end
 
 return M

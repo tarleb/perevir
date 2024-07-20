@@ -1,5 +1,5 @@
-.PHONY: test test-acceptance test-filter
-test: test-acceptance test-filter
+.PHONY: test test-acceptance test-filter test-sections
+test: test-acceptance test-filter test-sections
 	@pandoc-lua test/md-checker.lua test/markdown/emphasis.md
 	@if pandoc-lua test/md-checker.lua test/markdown/failure.md 2>/dev/null; then \
 	    exit 1; \
@@ -10,3 +10,6 @@ test-acceptance:
 
 test-filter:
 	@pandoc-lua perevir.lua test/markdown/check-filter.md
+
+test-sections:
+	@pandoc-lua perevir.lua test/markdown/sections.md
