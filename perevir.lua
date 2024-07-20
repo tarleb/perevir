@@ -174,11 +174,7 @@ TestRunner.report_failure = function (test)
 end
 
 --- Run the test in the given file.
-TestRunner.run_test_file = function (self, filepath, accept)
-  local testfile = assert(filepath, "test file required")
-  local testparser = TestParser.new()
-  local test = testparser:create_test(testfile)
-
+TestRunner.run_test = function (self, test, accept)
   assert(test.input, 'No input found in test file ' .. test.filepath)
   assert(
     accept or test.output,
@@ -203,27 +199,54 @@ TestRunner.run_test_file = function (self, filepath, accept)
   end
 end
 
-function M.test_files_in_dir(reader, source, accept)
-  local runner = TestRunner.new()
-  local success = true
-  local is_dir, dirfiles = pcall(system.list_directory, source)
+--- Complete tester object.
+local Perevirka = {}
+Perevirka.__index = Perevirka
+Perevirka.accept = false
+Perevirka.runner = TestRunner.new()
+Perevirka.test_parser = TestParser.new()
+Perevirka.new = function (opts)
+  local perevirka = {}
+  perevirka.runner = opts.runner
+  perevirka.test_parser = opts.test_parser
+  return setmetatable({}, Perevirka)
+end
+
+function Perevirka:test_file (filepath)
+  assert(filepath, "test file required")
+  local test = self.test_parser:create_test(testfile)
+  return self.runner:run_test(test, self.accept)
+end
+
+function Perevirka:test_files_in_dir (filepath)
+  local is_dir, dirfiles = pcall(system.list_directory, filepath)
   local testfiles = pandoc.List{}
   if not is_dir then
-    testfiles:insert(source)
+    testfiles:insert(filepath)
   else
-    local add_dir = function(p) return path.join{source, p} end
+    local add_dir = function(p) return path.join{filepath, p} end
     testfiles = pandoc.List(dirfiles):map(add_dir)
   end
 
+  local success = true
   for _, testfile in ipairs(testfiles) do
-    success = runner:run_test_file(testfile, accept) and success
+    success = self:test_file(filepath) and success
   end
 
   os.exit(success and 0 or 1)
 end
 
+--- Perform tests on the files given in `opts.path`.
 function M.do_checks(reader, opts)
-  return M.test_files_in_dir(reader, opts.path, opts.accept)
+  local perevirka = Perevirka.new {
+    runner = TestRunner.new{reader = reader},
+    accept = opts.accept,
+  }
+  return perevirka:test_files_in_dir(opts.path)
 end
+
+M.Perevirka = Perevirka
+M.TestParser = TestParser
+M.TestRunner = TestRunner
 
 return M
