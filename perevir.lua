@@ -14,6 +14,9 @@ local mediabag = require 'pandoc.mediabag'
 local path     = require 'pandoc.path'
 local system   = require 'pandoc.system'
 
+--- Command line arguments; only set when invoked as a script.
+local arg = arg
+
 local usage = [==[Usage:
 
     %s [-a] TESTFILE
@@ -256,5 +259,12 @@ end
 M.Perevirka = Perevirka
 M.TestParser = TestParser
 M.TestRunner = TestRunner
+
+-- Run the default tests when the file is called as a script.
+if arg then
+  local Reader = pandoc.read
+  local opts = M.parse_args(arg)
+  M.do_checks(Reader, opts)
+end
 
 return M
