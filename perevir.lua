@@ -271,7 +271,7 @@ M.TestParser = TestParser
 M.TestRunner = TestRunner
 
 -- Run the default tests when the file is called as a script.
-if arg then
+if not pcall(debug.getlocal, 4, 1) then
   local Reader = pandoc.read
   local opts = M.parse_args(arg)
   M.do_checks(Reader, opts)
