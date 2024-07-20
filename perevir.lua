@@ -141,16 +141,6 @@ end
 local TestRunner = {}
 TestRunner.__index = TestRunner
 
-TestRunner.reader = function (block, opts)
-  if block.t == 'CodeBlock' then
-    local format = block.classes[1] or 'markdown'
-    local exts = block.attributes.extensions or ''
-    -- pandoc gobbles the final newline in code blocks
-    return pandoc.read(block.text .. '\n', format .. exts, opts)
-  end
-  return pandoc.Pandoc(block.content)
-end
-
 function TestRunner.new (opts)
   opts = opts or {}
   local newtr = {
@@ -209,6 +199,23 @@ TestRunner.report_failure = function (test)
   io.stderr:write(actual_str)
 end
 
+function TestRunner:get_doc (block)
+  if block.t == 'CodeBlock' then
+    local text = block.text .. '\n'
+
+    if self.reader then
+      return self.reader(text)
+    else
+      local format = block.classes[1] or 'markdown'
+      local exts = block.attributes.extensions or ''
+      -- pandoc gobbles the final newline in code blocks
+      return pandoc.read(text, format .. exts)
+    end
+  end
+  return pandoc.Pandoc(block.content)
+end
+
+
 --- Run the test in the given file.
 TestRunner.run_test = function (self, test, accept)
   assert(test.input, 'No input found in test file ' .. test.filepath)
@@ -217,7 +224,7 @@ TestRunner.run_test = function (self, test, accept)
     'No expected output found in test file ' .. test.filepath
   )
 
-  test.actual = self.reader(test.input)
+  test.actual = self:get_doc(test.input)
 
   for i, filter in ipairs(test.options.filters or {}) do
     test.actual = utils.run_lua_filter(test.actual, utils.stringify(filter))
