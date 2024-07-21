@@ -208,7 +208,7 @@ end
 
 function TestRunner:get_doc (block)
   if block.t == 'CodeBlock' then
-    local text = block.text .. '\n'
+    local text = block.text .. '\n\n'
 
     if self.reader then
       return self.reader(text)
