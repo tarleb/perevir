@@ -190,8 +190,22 @@ TestRunner.accept = function (self, test, test_factory)
   fh:close()
 end
 
+TestRunner.diff = function (expected, actual)
+  return system.with_temporary_directory('perevir-diff', function (dir)
+    return system.with_working_directory(dir, function ()
+      local fha = io.open('actual', 'wb')
+      local fhe = io.open('expected', 'wb')
+      fha:write(actual)
+      fhe:write(expected)
+      fha:close()
+      fhe:close()
+      return io.popen('diff --color=always -c expected actual'):read('a')
+    end)
+  end)
+end
+
 --- Report a test failure
-TestRunner.report_failure = function (test)
+function TestRunner:report_failure (test)
   io.stderr:write('Failed: ' .. test.filepath .. '\n')
   assert(test.actual, "The actual result is missing from the test object")
   assert(test.expected, "The expected result is missing from the test object")
@@ -203,17 +217,8 @@ TestRunner.report_failure = function (test)
   end
   local actual_str   = pandoc.write(test.actual, 'native', opts)
   local expected_str = pandoc.write(test.expected, 'native', opts)
-  system.with_temporary_directory('perevir-diff', function (dir)
-    system.with_working_directory(dir, function ()
-      local fha = io.open('actual', 'wb')
-      local fhe = io.open('expected', 'wb')
-      fha:write(actual_str)
-      fhe:write(expected_str)
-      fha:close()
-      fhe:close()
-      os.execute('diff --color -c expected actual')
-    end)
-  end)
+  io.stderr:write(self.diff(expected_str, actual_str))
+  io.stderr:write('\n')
 end
 
 function TestRunner:get_doc (block)
@@ -232,44 +237,55 @@ function TestRunner:get_doc (block)
   return pandoc.Pandoc(block.content)
 end
 
-
---- Run the test in the given file.
-TestRunner.run_test = function (self, test, accept)
+function TestRunner:get_actual_doc (test)
   assert(test.input, 'No input found in test file ' .. test.filepath)
+  local actual = self:get_doc(test.input)
+  for i, filter in ipairs(test.options.filters or {}) do
+    actual = utils.run_lua_filter(actual, utils.stringify(filter))
+  end
+
+  return actual
+end
+
+function TestRunner:get_expected_doc (test, accept)
   assert(
     accept or test.output,
     'No expected output found in test file ' .. test.filepath
   )
 
-  test.actual = self:get_doc(test.input)
-
-  for i, filter in ipairs(test.options.filters or {}) do
-    test.actual = utils.run_lua_filter(test.actual, utils.stringify(filter))
-  end
-
   local output = test.output
-  local ok, expected_doc = true, pandoc.Pandoc(output)
   if output.t == 'CodeBlock' then
-    ok, expected_doc = pcall(pandoc.read, output.text, 'native')
+    local ok, expected_doc = pcall(pandoc.read, output.text, 'native')
+    return (ok or accept)
+      and expected_doc
+      or error('Could not parse expected doc: \n' .. output.text .. '\n')
   elseif output.t == 'Div' and output.classes[1] == 'section' then
     local section_content = output.content:clone()
     section_content:remove(1)
-    expected_doc = pandoc.Pandoc(section_content)
+    return pandoc.Pandoc(section_content)
   elseif output.t == 'Div' then
-    expected_doc = pandoc.Pandoc(output.content)
+    return pandoc.Pandoc(output.content)
+  else
+    error("Don't know how to handle output block; aborting.")
   end
+end
 
-  if ok and test.actual == expected_doc then
+--- Run the test in the given file.
+TestRunner.run_test = function (self, test, accept)
+  local actual   = self:get_actual_doc(test)
+  local expected = self:get_expected_doc(test, accept)
+
+  if actual == expected then
     return true
   elseif accept then
-    test.expected = expected_doc
+    test.actual   = actual
+    test.expected = expected
     self:accept(test)
     return true
-  elseif not ok then
-    io.stderr:write('Could not parse expected doc: \n' .. test.output .. '\n')
   else
-    test.expected = expected_doc
-    TestRunner.report_failure(test)
+    test.actual   = actual
+    test.expected = expected
+    self:report_failure(test)
     return false
   end
 end
