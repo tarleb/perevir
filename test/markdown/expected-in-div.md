@@ -14,13 +14,13 @@ expected document can't be "round-tripped" through the format.
 We're using a simple Org-mode paragraph as input.
 
 ``` {#input .org}
-This is /org-mode/ syntax. See the [[https://orgmode.org][website]] for
-details.
+This is /org-mode/ syntax. See the [[https://orgmode.org][website]]
+for details.
 ```
 
 The expected output is contained in a div:
 
 ::: {#expected}
-This is *org-mode* syntax. See the [website](https://orgmode.org) for
-details.
+This is *org-mode* syntax. See the [website](https://orgmode.org)
+for details.
 :::

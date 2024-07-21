@@ -181,7 +181,10 @@ TestRunner.accept = function (self, test, test_factory)
   if not found_outblock then
     doc.blocks:insert(pandoc.CodeBlock(actual_str, {'expected'}))
   end
-  local md_writer_opts = {template = template.default 'markdown'}
+  local md_writer_opts = {
+    template = template.default 'markdown',
+    wrap_text = 'preserve',
+  }
   local fh = io.open(filename, 'w')
   fh:write(pandoc.write(testdoc, 'markdown', md_writer_opts))
   fh:close()
