@@ -11,7 +11,6 @@ Stuff is *important*!
     , Str "is"
     , Space
     , Str "*important*!"
-    , SoftBreak
     ]
 ]
 ```
