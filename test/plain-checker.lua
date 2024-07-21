@@ -5,8 +5,8 @@ local perevir = require 'perevir'
 loadfile('test/plain-reader.lua')()
 
 local opts = perevir.parse_args(arg)
-local perevirka = perevir.Perevirka.new{
+local pereviryalnyk = perevir.Pereviryalnyk.new{
   accept = opts.accept,
   runner = perevir.TestRunner.new{reader = Reader},
 }
-perevirka:test_files_in_dir(opts.path)
+pereviryalnyk:test_files_in_dir(opts.path)

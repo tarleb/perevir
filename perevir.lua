@@ -299,26 +299,26 @@ TestRunner.run_test = function (self, test, accept)
 end
 
 --- Complete tester object.
-local Perevirka = {}
-Perevirka.__index = Perevirka
-Perevirka.accept = false
-Perevirka.runner = TestRunner.new()
-Perevirka.test_parser = TestParser.new()
-Perevirka.new = function (opts)
-  local perevirka = {}
-  perevirka.accept = opts.accept
-  perevirka.runner = opts.runner
-  perevirka.test_parser = opts.test_parser
-  return setmetatable(perevirka, Perevirka)
+local Pereviryalnyk = {}
+Pereviryalnyk.__index = Pereviryalnyk
+Pereviryalnyk.accept = false
+Pereviryalnyk.runner = TestRunner.new()
+Pereviryalnyk.test_parser = TestParser.new()
+Pereviryalnyk.new = function (opts)
+  local pereviryalnyk = {}
+  pereviryalnyk.accept = opts.accept
+  pereviryalnyk.runner = opts.runner
+  pereviryalnyk.test_parser = opts.test_parser
+  return setmetatable(pereviryalnyk, Pereviryalnyk)
 end
 
-function Perevirka:test_file (filepath)
+function Pereviryalnyk:test_file (filepath)
   assert(filepath, "test file required")
   local test = self.test_parser:create_test(filepath)
   return self.runner:run_test(test, self.accept)
 end
 
-function Perevirka:test_files_in_dir (filepath)
+function Pereviryalnyk:test_files_in_dir (filepath)
   local is_dir, dirfiles = pcall(system.list_directory, filepath)
   local testfiles = pandoc.List{}
   if not is_dir then
@@ -338,14 +338,15 @@ end
 
 --- Perform tests on the files given in `opts.path`.
 function M.do_checks(opts)
-  local perevirka = Perevirka.new {
+  local pereviryalnyk = Pereviryalnyk.new {
     runner = opts.runner or TestRunner.new(),
     accept = opts.accept,
   }
-  return perevirka:test_files_in_dir(opts.path)
+  return pereviryalnyk:test_files_in_dir(opts.path)
 end
 
-M.Perevirka = Perevirka
+M.Pereviryalnyk = Pereviryalnyk
+M.Tester = Pereviryalnyk
 M.TestParser = TestParser
 M.TestRunner = TestRunner
 
