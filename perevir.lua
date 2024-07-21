@@ -269,17 +269,10 @@ function TestRunner:get_actual_doc (test)
 end
 
 function TestRunner:get_expected_doc (test, accept)
-  assert(
-    accept or test.output,
-    'No expected output found in test file ' .. test.filepath
-  )
-
+  assert(test.output, 'No expected output found in file ' .. test.filepath)
   local output = test.output
   if output.t == 'CodeBlock' then
-    local ok, expected_doc = pcall(pandoc.read, output.text, 'native')
-    return (ok or accept)
-      and expected_doc
-      or error('Could not parse expected doc: \n' .. output.text .. '\n')
+    return pandoc.read(output.text, 'native')
   elseif output.t == 'Div' and output.classes[1] == 'section' then
     local section_content = output.content:clone()
     section_content:remove(1)
@@ -318,7 +311,7 @@ TestRunner.run_test = function (self, test, accept)
   end
 
   local actual   = self:get_actual_doc(test)
-  local expected = self:get_expected_doc(test, accept)
+  local expected = accept or self:get_expected_doc(test, accept)
 
   if actual == expected then
     return true
