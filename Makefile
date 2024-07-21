@@ -7,19 +7,19 @@ test: \
 		test-filter \
 		test-sections \
 		test-custom-reader
-	@pandoc-lua test/md-checker.lua test/markdown/emphasis.md
-	@if pandoc-lua test/md-checker.lua test/markdown/failure.md 2>/dev/null; then \
+	@pandoc-lua test/md-checker.lua test/perevirky/emphasis.md
+	@if pandoc-lua test/md-checker.lua test/perevirky/failure.md 2>/dev/null; then \
 	    exit 1; \
 	fi
 
 test-acceptance:
-	@test/check-acceptance.sh test/markdown/failure.md test/markdown/emphasis.md
+	@test/check-acceptance.sh test/perevirky/failure.md test/perevirky/emphasis.md
 
 test-filter:
-	@pandoc-lua perevir.lua test/markdown/check-filter.md
+	@pandoc-lua perevir.lua test/perevirky/check-filter.md
 
 test-sections:
-	@pandoc-lua perevir.lua test/markdown/sections.md
+	@pandoc-lua perevir.lua test/perevirky/sections.md
 
 test-custom-reader:
-	@pandoc-lua test/plain-checker.lua test/markdown/plain.md
+	@pandoc-lua test/plain-checker.lua test/perevirky/plain.md
