@@ -17,6 +17,8 @@ local structure= require 'pandoc.structure'
 local template = require 'pandoc.template'
 local utils    = require 'pandoc.utils'
 
+local ptype = utils.type
+
 --- Command line arguments; only set when invoked as a script.
 local arg = arg
 
@@ -46,6 +48,14 @@ function M.parse_args (args)
     accept = accept,
     path = args[1],
   }
+end
+
+local function split (str)
+  local list = pandoc.List{}
+  for s in string.gmatch(str, '[^%s]+') do
+    list:insert(s)
+  end
+  return list
 end
 
 
@@ -164,11 +174,13 @@ TestRunner.accept = function (self, test, test_factory)
   local filename = test.filepath
   local testdoc = test.doc
   local writer_opts = {}
-  if next(actual.meta) then
+  if ptype(actual) == 'Pandoc' and next(actual.meta) then
     -- has metadata, use template
     writer_opts.template = pandoc.template.default 'native'
   end
-  local actual_str = pandoc.write(actual, 'native', writer_opts)
+  local actual_str = ptype(actual) == 'string'
+    and actual
+    or pandoc.write(actual, 'native', writer_opts)
   local found_outblock = false
   testdoc = testdoc:walk{
     CodeBlock = function (cb)
@@ -180,6 +192,7 @@ TestRunner.accept = function (self, test, test_factory)
     end,
     Div = function (div)
       if test_factory.is_output(div) then
+        assert(ptype(actual) == 'Pandoc', 'Actual value in test must be Pandoc')
         found_outblock = true
         div.content = actual.blocks
         return div
@@ -278,8 +291,32 @@ function TestRunner:get_expected_doc (test, accept)
   end
 end
 
+function TestRunner:run_command_test (test, accept)
+  local pandoc_args = split(test.command.text)
+  assert(pandoc_args:remove(1) == 'pandoc', 'Must be a pandoc command.')
+  local input_str = test.input.text
+  local actual = pandoc.pipe('pandoc', pandoc_args, input_str)
+  local expected = test.output.text .. '\n'
+  if actual == expected then
+    return true
+  elseif accept then
+    test.actual   = actual
+    test.expected = expected
+    self:accept(test)
+    return true
+  else
+    io.stderr:write(self.diff(expected, actual))
+    io.stderr:write('\n')
+    return false
+  end
+end
+
 --- Run the test in the given file.
 TestRunner.run_test = function (self, test, accept)
+  if test.command then
+    return self:run_command_test(test, accept)
+  end
+
   local actual   = self:get_actual_doc(test)
   local expected = self:get_expected_doc(test, accept)
 
