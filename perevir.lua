@@ -78,6 +78,11 @@ function TestParser.is_input (block)
     or block.identifier:match'^in$'
 end
 
+function TestParser.is_command (block)
+  return block.identifier
+    and block.identifier:match '^command$'
+end
+
 --- Parses a test file into a Pandoc object.
 function TestParser.reader (text, opts)
   return pandoc.read(text, 'markdown', opts)
@@ -101,6 +106,8 @@ function TestParser:get_test_blocks (doc)
         set('input', cb)
       elseif self.is_output(cb) then
         set('output', cb)
+      elseif self.is_command(cb) then
+        set('command', cb)
       end
     end,
     Div = function (div)
@@ -117,14 +124,14 @@ function TestParser:get_test_blocks (doc)
     section.content:remove(1)
     blocks.input = section
   end
-  return blocks.input, blocks.output
+  return blocks.input, blocks.output, blocks.command
 end
 
 --- Generates a new test object from the given file.
 function TestParser:create_test (filepath)
   local text = select(2, mediabag.fetch(filepath))
   local doc = self.reader(text)
-  local input, output = self:get_test_blocks(doc)
+  local input, output, command = self:get_test_blocks(doc)
   return {
     filepath = filepath,       -- path to the test file
     text     = text,           -- full text for this test
@@ -132,6 +139,7 @@ function TestParser:create_test (filepath)
     options  = doc.meta.perevir or {}, -- test options
     input    = input,          -- input code block or div
     output   = output,         -- expected string output
+    command  = command,        -- specific command to run on the input
     actual   = false,          -- actual conversion result (Pandoc|false)
     expected = false,          -- expected document result (Pandoc|false)
   }
