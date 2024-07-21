@@ -169,6 +169,13 @@ TestRunner.accept = function (self, test, test_factory)
         cb.text = actual_str
         return cb
       end
+    end,
+    Div = function (div)
+      if test_factory.is_output(div) then
+        found_outblock = true
+        div.content = actual.blocks
+        return div
+      end
     end
   }
   if not found_outblock then
