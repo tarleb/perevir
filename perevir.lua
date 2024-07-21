@@ -289,7 +289,7 @@ function Perevirka:test_files_in_dir (filepath)
 
   local success = true
   for _, testfile in ipairs(testfiles) do
-    success = self:test_file(filepath) and success
+    success = self:test_file(testfile) and success
   end
 
   os.exit(success and 0 or 1)
