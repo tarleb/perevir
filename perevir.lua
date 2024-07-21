@@ -182,21 +182,28 @@ end
 
 --- Report a test failure
 TestRunner.report_failure = function (test)
-  local opts = {}
+  io.stderr:write('Failed: ' .. test.filepath .. '\n')
   assert(test.actual, "The actual result is missing from the test object")
   assert(test.expected, "The expected result is missing from the test object")
+
+  local opts = {}
   if next(test.actual.meta) or (next(test.expected.meta)) then
     -- has metadata, use template
     opts.template = pandoc.template.default 'native'
   end
   local actual_str   = pandoc.write(test.actual, 'native', opts)
   local expected_str = pandoc.write(test.expected, 'native', opts)
-  io.stderr:write('Failed: ' .. test.filepath .. '\n')
-  io.stderr:write('Expected:\n')
-  io.stderr:write(expected_str)
-  io.stderr:write('\n\n')
-  io.stderr:write('Actual:\n')
-  io.stderr:write(actual_str)
+  system.with_temporary_directory('perevir-diff', function (dir)
+    system.with_working_directory(dir, function ()
+      local fha = io.open('actual', 'wb')
+      local fhe = io.open('expected', 'wb')
+      fha:write(actual_str)
+      fhe:write(expected_str)
+      fha:close()
+      fhe:close()
+      os.execute('diff --color -c expected actual')
+    end)
+  end)
 end
 
 function TestRunner:get_doc (block)
