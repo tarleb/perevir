@@ -205,14 +205,27 @@ TestRunner.accept = function (self, test, test_factory)
   local actual = test.actual
   local filename = test.filepath
   local testdoc = test.doc
-  local writer_opts = {}
-  if ptype(actual) == 'Pandoc' and next(actual.meta) then
-    -- has metadata, use template
-    writer_opts.template = pandoc.template.default 'native'
+
+  local actual_str
+
+  if ptype(actual) == 'string' then
+    actual_str = actual
+  else
+    local writer_opts = {}
+    local format = test.output.classes[1] or 'native'
+    if format == 'haskell' then
+      format = 'native'
+    end
+    local exts = test.output.attributes.extensions or ''
+
+    if ptype(actual) == 'Pandoc' and next(actual.meta) then
+      -- has metadata, use template
+      writer_opts.template = pandoc.template.default(format)
+    end
+
+    actual_str = pandoc.write(actual, format .. exts, writer_opts)
   end
-  local actual_str = ptype(actual) == 'string'
-    and actual
-    or pandoc.write(actual, 'native', writer_opts)
+
   local found_outblock = false
   testdoc = testdoc:walk{
     CodeBlock = function (cb)
@@ -305,7 +318,12 @@ function TestRunner:get_expected_doc (test, accept)
   assert(test.output, 'No expected output found in file ' .. test.filepath)
   local output = test.output
   if output.t == 'CodeBlock' then
-    return pandoc.read(output.text, 'native')
+    local format = output.classes[1] or 'native'
+    if format == 'haskell' then
+      format = 'native'
+    end
+    local exts = output.attributes.extensions or ''
+    return pandoc.read(output.text, format .. exts)
   elseif output.t == 'Div' and output.classes[1] == 'section' then
     local section_content = output.content:clone()
     section_content:remove(1)
