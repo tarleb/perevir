@@ -8,7 +8,7 @@ perevir:
 Let's turn _*this*_ into [this]{.smallcaps}.
 ```
 
-``` {#expected .haskell}
+``` haskell {#expected}
 [ Para
     [ Str "Let\8217s"
     , Space

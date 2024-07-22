@@ -13,7 +13,7 @@ expected document can't be "round-tripped" through the format.
 
 We're using a simple Org-mode paragraph as input.
 
-``` {#input .org}
+``` org {#input}
 This is /org-mode/ syntax. See the [[https://orgmode.org][website]]
 for details.
 ```

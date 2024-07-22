@@ -67,6 +67,21 @@ function M.parse_args (args)
   }
 end
 
+--- A filter to generate GitHub-friendly code-blocks
+local mod_syntax = {
+  CodeBlock = function (cb)
+    local lang = cb.classes:remove(1)
+    if lang then
+      local mdcode = pandoc.write(pandoc.Pandoc{cb}, 'markdown')
+      return pandoc.RawBlock(
+        'markdown',
+        mdcode:gsub('^```+', '%1 ' .. lang)
+      )
+    end
+  end
+}
+
+--- Split a string on whitespace into a list.
 local function split (str)
   local list = pandoc.List{}
   for s in string.gmatch(str, '[^%s]+') do
@@ -74,7 +89,6 @@ local function split (str)
   end
   return list
 end
-
 
 --- Test factory.
 local TestParser = {}
@@ -225,7 +239,7 @@ TestRunner.accept = function (self, test, test_factory)
     wrap_text = 'preserve',
   }
   local fh = io.open(filename, 'w')
-  fh:write(pandoc.write(testdoc, 'markdown', md_writer_opts))
+  fh:write(pandoc.write(testdoc:walk(mod_syntax), 'markdown', md_writer_opts))
   fh:close()
 end
 
