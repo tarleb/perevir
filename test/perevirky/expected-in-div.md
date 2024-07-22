@@ -18,11 +18,13 @@ This is /org-mode/ syntax. See the [[https://orgmode.org][website]]
 for details.
 ```
 
-The expected output is contained in a div:
+The expected output is wrapped in a div. Here we also put the div
+into an additional block quote to separate is from the rest of the
+text. However, this isn't necessary.
 
-<div id="expected">
-
-This is *org-mode* syntax. See the [website](https://orgmode.org)
-for details.
-
-</div>
+> <div id="expected">
+>
+> This is *org-mode* syntax. See the [website](https://orgmode.org)
+> for details.
+>
+> </div>
