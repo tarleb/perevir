@@ -78,7 +78,7 @@ local mod_syntax = {
         mdcode:gsub('^```+', '%1 ' .. lang)
       )
     end
-  end
+  end,
 }
 
 --- Split a string on whitespace into a list.
@@ -239,7 +239,8 @@ TestRunner.accept = function (self, test, test_factory)
     wrap_text = 'preserve',
   }
   local fh = io.open(filename, 'w')
-  fh:write(pandoc.write(testdoc:walk(mod_syntax), 'markdown', md_writer_opts))
+  local out_format = 'markdown-fenced_divs'
+  fh:write(pandoc.write(testdoc:walk(mod_syntax), out_format, md_writer_opts))
   fh:close()
 end
 

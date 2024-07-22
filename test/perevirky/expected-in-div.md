@@ -20,7 +20,9 @@ for details.
 
 The expected output is contained in a div:
 
-::: {#expected}
+<div id="expected">
+
 This is *org-mode* syntax. See the [website](https://orgmode.org)
 for details.
-:::
+
+</div>
