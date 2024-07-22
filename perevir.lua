@@ -24,12 +24,15 @@ local arg = arg
 
 local usage = [==[Usage:
 
-    %s [-a] TESTFILE
+    %s [-a] [-f FORMAT] TESTFILE
 
 Options:
 
   -a: Accept the parse result as correct and update the test file.
+
+  -f: Sets the reader format used to parse perevirky test definitions.
 ]==]
+
 
 --- The perevir module.
 local M = {}
@@ -37,16 +40,30 @@ local M = {}
 --- Parse command line arguments
 function M.parse_args (args)
   local accept = false -- whether to accept output as correct
-  for i = #args, 1, -1 do
+  local format = 'markdown'
+  local path
+  local i = 1
+  while i <= #args do
     if args[i] == '-a' then
       accept = true
-      table.remove(args, i)
+      i = i + 1
+    elseif args[i] == '-f' then
+      format = args[i+1]
+      i = i + 2
+    elseif args[i]:sub(1,1) == '-' then
+      io.stdout:write(usage)
+      io.stdout:write('\n')
+      os.exit(2)
+    else
+      path = args[i]
+      i = i + 1
     end
   end
 
   return {
     accept = accept,
-    path = args[1],
+    format = format,
+    path = path,
   }
 end
 
@@ -69,6 +86,7 @@ function TestParser.new (opts)
   local newtp = {
     is_output = opts.is_output,
     is_input  = opts.is_input,
+    format    = opts.format,
     reader    = opts.reader,
   }
   return setmetatable(newtp, TestParser)
@@ -94,8 +112,8 @@ function TestParser.is_command (block)
 end
 
 --- Parses a test file into a Pandoc object.
-function TestParser.reader (text, opts)
-  return pandoc.read(text, 'markdown', opts)
+function TestParser:reader (text, opts)
+  return pandoc.read(text, self.format, opts)
 end
 
 --- Get the code blocks that define the tests
@@ -140,7 +158,7 @@ end
 --- Generates a new test object from the given file.
 function TestParser:create_test (filepath)
   local text = select(2, mediabag.fetch(filepath))
-  local doc = self.reader(text)
+  local doc = self:reader(text)
   local input, output, command = self:get_test_blocks(doc)
   return {
     filepath = filepath,       -- path to the test file
@@ -200,7 +218,7 @@ TestRunner.accept = function (self, test, test_factory)
     end
   }
   if not found_outblock then
-    doc.blocks:insert(pandoc.CodeBlock(actual_str, {'expected'}))
+    testdoc.blocks:insert(pandoc.CodeBlock(actual_str, {'expected'}))
   end
   local md_writer_opts = {
     template = template.default 'markdown',
@@ -332,6 +350,7 @@ end
 local Pereviryalnyk = {}
 Pereviryalnyk.__index = Pereviryalnyk
 Pereviryalnyk.accept = false
+Pereviryalnyk.format = 'markdown'
 Pereviryalnyk.runner = TestRunner.new()
 Pereviryalnyk.test_parser = TestParser.new()
 Pereviryalnyk.new = function (opts)
@@ -371,6 +390,8 @@ function M.do_checks(opts)
   local pereviryalnyk = Pereviryalnyk.new {
     runner = opts.runner or TestRunner.new(),
     accept = opts.accept,
+    format = opts.format,
+    test_parser = TestParser.new { format = opts.format },
   }
   return pereviryalnyk:test_files_in_dir(opts.path)
 end
