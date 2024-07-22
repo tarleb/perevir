@@ -293,7 +293,7 @@ function TestRunner:get_doc (block)
     local text = block.text .. '\n\n'
 
     if self.reader then
-      return self.reader(text)
+      return self.reader(text, block.attr)
     else
       local format = block.classes[1] or 'markdown'
       local exts = block.attributes.extensions or ''
