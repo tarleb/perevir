@@ -26,17 +26,27 @@ documents, offering syntax highlighting etc. Test definitions
 (perevirky) should be readable on those platforms, and thus can
 double as easily accessible and always up-to-date documentation.
 
+Installation
+------------
+
+The tool is a single file and thus easy to install. Just download
+`perevir.lua` and call it with `pandoc lua perevir.lua
+<TESTFILE>`.
+
+When used as a command-line program you'll need to have pandoc
+installed and have a "`pandoc-lua`" symlink to pandoc in your
+path.
+
 Usage
 -----
 
 Perevir can be used both as a command line program and as a
-library to create customized checkers. When used as a command-line
-program you'll need to have pandoc installed and have a symlink to
-pandoc in your path that's named `pandoc-lua`.
+library to create customized checkers. The command line program
+takes as argument the testfile, or a directory of test files.
 
     ./perevir.lua <TEST-FILE-OR-DIR>
 
-The format for test files is described below.
+The format for test files, called "perevirky", is described below.
 
 Since it's often cumbersome to write (or update) expected results
 by hand, this can be automated. Call `perevir.lua` with `-a` to
