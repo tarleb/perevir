@@ -239,7 +239,7 @@ TestRunner.accept = function (self, test, test_factory)
     wrap_text = 'preserve',
   }
   local fh = io.open(filename, 'w')
-  local out_format = 'markdown-fenced_divs'
+  local out_format = 'markdown-fenced_divs-simple_tables'
   fh:write(pandoc.write(testdoc:walk(mod_syntax), out_format, md_writer_opts))
   fh:close()
 end
