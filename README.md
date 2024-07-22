@@ -3,7 +3,7 @@ perevir
 
 A tool to test pandoc document transformations.
 
-*Perevir* aims to make test easy to write and use, and to have
+*Perevir* aims to make tests easy to write and use, and to have
 tests that can also serve as a form of documentation. Ideally,
 test files should be readable and informative when viewed as
 rendered Markdown on a developer platform such as GitHub, GitLab,
@@ -36,6 +36,21 @@ The tool is a single file and thus easy to install. Just download
 When used as a command-line program you'll need to have pandoc
 installed and have a "`pandoc-lua`" symlink to pandoc in your
 path.
+
+### luarocks
+
+An alternative installation method is via [luarocks][], the
+package manager for Lua.
+
+```sh
+luarocks install --local perevir
+```
+
+In addition, it may also be necessary to run `eval "$(luarocks
+path)"` to set the environment variables to the correct values.
+
+[luarocks]: https://luarocks.org/
+
 
 Usage
 -----
