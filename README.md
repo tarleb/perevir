@@ -71,31 +71,95 @@ file will be modified in-place.
 Perevirky (test files)
 ----------------------
 
-All perevirky much have at least two parts: *input* and *expected
-output*. Each of these parts is marked by setting an appropriate
-ID on an element.
+All perevirky much have two parts: *input* and *expected output*.
+Each of these parts is marked by setting an appropriate element
+ID: `input` for the input and `expected` or `output` for the
+expected result.
 
-E.g., input that is to be treated as Markdown input would be
-defined as
+The example below is a very minimal test that would verify the
+build-in markdown reader, checking that it produces the correct
+"pandoc native" output.
 
 ````` markdown
-```{#input .markdown}
-This is _*nice*_!
+``` markdown {#input}
+This is *nice*!
 ```
-`````
 
-while the expected internal pandoc representation would be defined as
+The internal document representation for this Markdown is
 
-````` markdown
-```{#expected .haskell}
+``` haskell {#expected}
 [ Para
     [ Str "This"
     , Space
     , Str "is"
     , Space
-    , Emph [ Emph [ Str "nice" ] ]
+    , Emph [ Str "nice" ]
     , Str "!"
     ]
 ]
 ```
 `````
+
+Notice the IDs on the code blocks, and that there can be any kind
+of explanatory text outside of the input and output blocks.
+
+### Format specifications
+
+How a code block is parsed into a pandoc document depends on the
+classes and attributes. In general, the (markup) language
+identifier is used as the name of a pandoc reader. Hence
+
+````markdown
+```html {#input}
+<h1>Intro</h1>
+```
+````
+
+marks that the block content must be parsed as HTML.
+
+The `extensions` attribute can be set to fine-tune the reader as
+one would on the command line. E.g., to disable the *smart*
+extension when parsing the input, one might write
+
+````markdown
+``` markdown {#input extensions="-smart"}
+"Yeah, right."
+```
+````
+
+### Input and output divs
+
+Normal (pandoc Markdown) text is generally easier and more
+pleasant to read than codeblocks with markup. It is therefore
+possible to use divs to set the input or expected output.
+
+```` markdown
+<div id="input">
+
+Normal [pandoc](https://pandoc.org) Markdown
+paragraph.
+
+</div>
+````
+
+### Command tests
+
+Command tests allow to set a specific pandoc command that
+transforms the input into the output. The command must be the
+content of a code block with ID `command`.
+
+````markdown
+``` sh {#command}
+pandoc --from=org --to=html --number-sections
+```
+````
+
+The classes on the input and output blocks have no effect in this
+case.
+
+Command tests differ from other tests in that they compare the
+expected and actual output as strings. Other tests compare the
+respective pandoc documents as objects.
+
+This kind of test is particularly useful when testing writer
+features, which otherwise are difficult to check.
