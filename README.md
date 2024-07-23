@@ -127,6 +127,12 @@ extension when parsing the input, one might write
 ```
 ````
 
+Perevir reads the input and output blocks into pandoc's internal
+document format. The tests checking the conversion results use the
+objects of that internal format, **not** the string
+representation. This gives a better accuracy and also makes tests
+more robust.
+
 ### Input and output divs
 
 Normal (pandoc Markdown) text is generally easier and more
@@ -141,6 +147,11 @@ paragraph.
 
 </div>
 ````
+
+It is advisable to use HTML divs instead of pandoc's own fenced
+divs syntax, as fenced divs are not supported on most development
+platforms and perevirky become less readable when viewed there.
+Perevir disables fenced divs when rewriting perevirky with `-a`.
 
 ### Command tests
 
