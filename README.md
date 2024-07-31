@@ -17,12 +17,12 @@ Motivation
 
 Extensions for pandoc, for example pandoc Lua filters, should be
 tested just like any other software. Perevir can read text files
-with input and the expected output, and it will check whether the
+with input and the expected output, and check whether the
 conversion succeeded.
 
 These extensions are often hosted on development platforms that
-allow to view Markdown files either as code or as rendered
-documents, offering syntax highlighting etc. Test definitions
+allow Markdown files to be viewed either as code or as rendered
+documents, and offer syntax highlighting etc. Test definitions
 (perevirky) should be readable on those platforms, and thus can
 double as easily accessible and always up-to-date documentation.
 
@@ -76,8 +76,8 @@ Each of these parts is marked by setting an appropriate element
 ID: `input` for the input and `expected` or `output` for the
 expected result.
 
-The example below is a very minimal test that would verify the
-build-in markdown reader, checking that it produces the correct
+The example below is a very simple test that would verify the
+built-in Markdown reader, checking whether it produces the correct
 "pandoc native" output.
 
 ````` markdown
@@ -130,7 +130,7 @@ extension when parsing the input, one might write
 Perevir reads the input and output blocks into pandoc's internal
 document format. The tests checking the conversion results use the
 objects of that internal format, **not** the string
-representation. This gives a better accuracy and also makes tests
+representation. This improves accuracy and also makes tests
 more robust.
 
 ### Input and output divs
