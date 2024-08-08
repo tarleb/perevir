@@ -307,8 +307,15 @@ end
 function TestRunner:get_actual_doc (test)
   assert(test.input, 'No input found in test file ' .. test.filepath)
   local actual = self:get_doc(test.input)
-  for i, filter in ipairs(test.options.filters or {}) do
-    actual = utils.run_lua_filter(actual, utils.stringify(filter))
+  local filters = test.options.filters
+    and test.options.filters:map(utils.stringify)
+    or {}
+  for _, filter in ipairs(filters) do
+    if filter == 'citeproc' then
+      actual = utils.citeproc(actual)
+    else
+      actual = utils.run_lua_filter(actual, filter)
+    end
   end
 
   return actual
