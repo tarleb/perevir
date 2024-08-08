@@ -153,6 +153,20 @@ divs syntax, as fenced divs are not supported on most development
 platforms and perevirky become less readable when viewed there.
 Perevir disables fenced divs when rewriting perevirky with `-a`.
 
+### Options
+
+Perevir can be configured by setting values below the `perevir`
+metadata field. Currently only the `filters` option is supported:
+it takes a list of filters that are run on the input. Example:
+
+``` yaml
+perevir:
+  filters: ['transmogrify.lua']
+```
+
+This will run the `transmogrify.lua` Lua filter on the input and
+will make perevir check the result against the given output.
+
 ### Command tests
 
 Command tests allow to set a specific pandoc command that
