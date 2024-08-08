@@ -41,7 +41,7 @@ local M = {}
 function M.parse_args (args)
   local accept = false -- whether to accept output as correct
   local format = 'markdown'
-  local path
+  local filepath
   local i = 1
   while i <= #args do
     if args[i] == '-a' then
@@ -55,7 +55,7 @@ function M.parse_args (args)
       io.stdout:write('\n')
       os.exit(2)
     else
-      path = args[i]
+      filepath = args[i]
       i = i + 1
     end
   end
@@ -63,7 +63,7 @@ function M.parse_args (args)
   return {
     accept = accept,
     format = format,
-    path = path,
+    path = filepath,
   }
 end
 
