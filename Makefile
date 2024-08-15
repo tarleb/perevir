@@ -13,7 +13,7 @@ test: \
 	fi
 
 test-acceptance:
-	@test/check-acceptance.sh test/perevirky/failure.md test/perevirky/emphasis.md
+	@test/accept/check-acceptance.sh test/accept/failure.md test/accept/accepted.md
 
 test-filter:
 	@pandoc-lua perevir.lua test/perevirky/check-filter.md
