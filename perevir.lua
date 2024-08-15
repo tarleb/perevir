@@ -82,6 +82,24 @@ local mod_syntax = {
   end,
 }
 
+--- A filter to replace plain strings with Inlines in metadata.
+local metastrings_to_inlines = {
+  Meta = function (meta)
+    local function str2inlines (metadata)
+      if type(metadata) == 'table' then
+        for key, value in pairs(metadata) do
+          metadata[key] = str2inlines(value)
+        end
+      elseif type(metadata) == 'string' then
+        return pandoc.Inlines(metadata)
+      end
+      return metadata
+    end
+
+    return str2inlines(meta)
+  end
+}
+
 --- Split a string on whitespace into a list.
 local function split (str)
   local list = pandoc.List{}
@@ -443,12 +461,16 @@ TestRunner.run_test = function (self, test, accept)
   end
   test.target_format = format or test.target_format
   local actual   = self:get_actual_doc(test)
+  local modifier_filters = List{}
   if test.options['ignore-softbreaks'] then
-    local softbreak_to_space = {
-      SoftBreak = function() return pandoc.Space() end
-    }
-    actual = actual:walk(softbreak_to_space)
-    expected = expected:walk(softbreak_to_space)
+    modifier_filters:insert{SoftBreak = function() return pandoc.Space() end}
+  end
+  if test.options['metastrings-to-inlines'] then
+    modifier_filters:insert(metastrings_to_inlines)
+  end
+  for _, modfilter in ipairs(modifier_filters) do
+    actual = actual:walk(modfilter)
+    expected = expected:walk(modfilter)
   end
 
   if actual == expected then

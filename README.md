@@ -164,6 +164,11 @@ supported:
 -   `ignore-softbreaks`: treat softbreaks as spaces, meaning that
     non-semantic linebreaks are ignored when comparing documents.
 
+-   `metastrings-to-inlines`: convert MetaStrings elements to
+    MetaInline elements. The Markdown parser never produces
+    MetaString values, so this is particularly useful when
+    the expected output contains a YAML metadata block.
+
 Example:
 
 ``` yaml
