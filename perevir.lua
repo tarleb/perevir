@@ -237,9 +237,9 @@ local copy_test = copy_table
 local function apply_test_options (test, default_options)
   local newtest = copy_test(test)
   for name, value in pairs(default_options) do
-    test.options[name] = test.options[name] == nil
-      and value
-      or test.options[name]
+    if newtest.options[name] == nil then
+      newtest.options[name] = value
+    end
   end
 
   return newtest
@@ -443,6 +443,13 @@ TestRunner.run_test = function (self, test, accept)
   end
   test.target_format = format or test.target_format
   local actual   = self:get_actual_doc(test)
+  if test.options['ignore-softbreaks'] then
+    local softbreak_to_space = {
+      SoftBreak = function() return pandoc.Space() end
+    }
+    actual = actual:walk(softbreak_to_space)
+    expected = expected:walk(softbreak_to_space)
+  end
 
   if actual == expected then
     return true

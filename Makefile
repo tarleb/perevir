@@ -1,10 +1,17 @@
 .PHONY: test \
-		test-acceptance test-filter test-sections \
+		test-%
+		test-acceptance \
+		test-diroptions \
+		test-filter \
+		test-ignore-softbreaks \
+		test-sections \
 		test-custom-reader
 
 test: \
 		test-acceptance \
+		test-diroptions \
 		test-filter \
+		test-ignore-softbreaks \
 		test-sections \
 		test-custom-reader
 	@pandoc-lua test/md-checker.lua test/perevirky/emphasis.md
@@ -22,8 +29,8 @@ test-diroptions:
 	@pandoc-lua perevir.lua test/dir-options/smallcaps.md
 	@pandoc-lua perevir.lua test/dir-options
 
-test-sections:
-	@pandoc-lua perevir.lua test/perevirky/sections.md
-
 test-custom-reader:
 	@pandoc-lua test/plain-checker.lua test/perevirky/plain.md
+
+test-%:
+	@pandoc-lua perevir.lua test/perevirky/$*.md

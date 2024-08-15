@@ -156,12 +156,20 @@ Perevir disables fenced divs when rewriting perevirky with `-a`.
 ### Options
 
 Perevir can be configured by setting values below the `perevir`
-metadata field. Currently only the `filters` option is supported:
-it takes a list of filters that are run on the input. Example:
+metadata field. Currently only the following options are
+supported:
+
+-   `filters`: it takes a list of filters that are run on the input.
+
+-   `ignore-softbreaks`: treat softbreaks as spaces, meaning that
+    non-semantic linebreaks are ignored when comparing documents.
+
+Example:
 
 ``` yaml
 perevir:
-  filters: ['transmogrify.lua']
+  filters: ['citeproc', 'transmogrify.lua']
+  ignore-softbreaks: true
 ```
 
 This will run the `transmogrify.lua` Lua filter on the input and
