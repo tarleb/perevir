@@ -18,6 +18,10 @@ test-acceptance:
 test-filter:
 	@pandoc-lua perevir.lua test/perevirky/check-filter.md
 
+test-diroptions:
+	@pandoc-lua perevir.lua test/dir-options/smallcaps.md
+	@pandoc-lua perevir.lua test/dir-options
+
 test-sections:
 	@pandoc-lua perevir.lua test/perevirky/sections.md
 

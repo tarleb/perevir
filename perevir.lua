@@ -10,6 +10,7 @@ local os = require 'os'
 
 -- Pandoc modules
 local pandoc   = require 'pandoc'
+local List     = require 'pandoc.List'
 local mediabag = require 'pandoc.mediabag'
 local path     = require 'pandoc.path'
 local system   = require 'pandoc.system'
@@ -90,6 +91,26 @@ local function split (str)
   return list
 end
 
+--- Reads a file and returns its contents.
+local function read_file (filename)
+  local fh = io.open(filename, 'r')
+  local content = fh:read('a')
+  fh:close()
+  return content
+end
+
+--- Returns true if the given filepath exists and is a file
+local function file_exists (filepath)
+  local f = io.open(filepath, 'r')
+  if f ~= nil then
+    io.close(f)
+    return true
+  else
+    return false
+  end
+end
+
+------------------------------------------------------------------------
 --- Test factory.
 local TestParser = {}
 TestParser.__index = TestParser
@@ -187,6 +208,33 @@ function TestParser:create_test (filepath)
   }
 end
 
+------------------------------------------------------------------------
+-- Test functions
+
+--- Create a copy of a test
+-- FIXME: this is a stub
+local function copy_test (test)
+  local new = {}
+  for key, value in pairs(test) do
+    new[key] = value
+  end
+
+  return new
+end
+
+--- Create a modified test with the given default options
+local function apply_test_options (test, default_options)
+  local newtest = copy_test(test)
+  for name, value in pairs(default_options) do
+    test.options[name] = test.options[name] == nil
+      and value
+      or test.options[name]
+  end
+
+  return newtest
+end
+
+------------------------------------------------------------------------
 --- The test runner
 local TestRunner = {}
 TestRunner.__index = TestRunner
@@ -386,6 +434,55 @@ TestRunner.run_test = function (self, test, accept)
   end
 end
 
+--- Run all tests in a test group
+function TestRunner:run_test_group (testgroup, accept)
+  local success = true
+  for _, test in ipairs(testgroup.tests) do
+    local localtest = apply_test_options(test, testgroup.options)
+    success = self:run_test(localtest, accept) and success
+  end
+
+  return success
+end
+
+------------------------------------------------------------------------
+--- Group of tests with common options
+local TestGroup = {
+  tests = List{},
+  options = {},
+}
+TestGroup.__index = TestGroup
+TestGroup.new = function (tests, options)
+  local tg = { tests = List(tests), options = options }
+  return setmetatable(tg, TestGroup)
+end
+TestGroup.from_path = function (filepath, test_from_file)
+  local is_dir, dirfiles = pcall(system.list_directory, filepath)
+  local testfiles = List{}
+  local optionsfile
+  if not is_dir then
+    testfiles:insert(filepath)
+    -- look for a config on the same level
+    local optionsfp = path.join{path.directory(filepath), 'perevir.yaml'}
+    optionsfile = file_exists(optionsfp) and optionsfp or nil
+  else
+    local add_dir = function(p) return path.join{filepath, p} end
+    for _, fp in ipairs(dirfiles) do
+      if fp == 'perevir.yaml' then
+        optionsfile = add_dir(fp)
+      else
+        testfiles:insert(add_dir(fp))
+      end
+    end
+  end
+
+  local options = optionsfile
+    and pandoc.read(read_file(optionsfile)).meta
+    or {}
+  return TestGroup.new(testfiles:map(test_from_file), options)
+end
+
+------------------------------------------------------------------------
 --- Complete tester object.
 local Pereviryalnyk = {}
 Pereviryalnyk.__index = Pereviryalnyk
@@ -408,19 +505,11 @@ function Pereviryalnyk:test_file (filepath)
 end
 
 function Pereviryalnyk:test_files_in_dir (filepath)
-  local is_dir, dirfiles = pcall(system.list_directory, filepath)
-  local testfiles = pandoc.List{}
-  if not is_dir then
-    testfiles:insert(filepath)
-  else
-    local add_dir = function(p) return path.join{filepath, p} end
-    testfiles = pandoc.List(dirfiles):map(add_dir)
+  local test_from_file = function (fp)
+    return self.test_parser:create_test(fp)
   end
-
-  local success = true
-  for _, testfile in ipairs(testfiles) do
-    success = self:test_file(testfile) and success
-  end
+  local testgroup = TestGroup.from_path(filepath, test_from_file)
+  local success = self.runner:run_test_group(testgroup, self.accept)
 
   os.exit(success and 0 or 1)
 end
