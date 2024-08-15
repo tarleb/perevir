@@ -205,22 +205,33 @@ function TestParser:create_test (filepath)
     command  = command,        -- specific command to run on the input
     actual   = false,          -- actual conversion result (Pandoc|false)
     expected = false,          -- expected document result (Pandoc|false)
+    target_format = 'native',  -- the FORMAT value passed to filters
   }
 end
 
 ------------------------------------------------------------------------
 -- Test functions
 
---- Create a copy of a test
--- FIXME: this is a stub
-local function copy_test (test)
-  local new = {}
-  for key, value in pairs(test) do
-    new[key] = value
+--- Create a deep copy of a table.
+local function copy_table (tbl, depth)
+  if type(tbl) == 'table' then
+    local copy = {}
+    -- Iterate 'raw' pairs, i.e., without using metamethods
+    for key, value in next, tbl, nil do
+      if depth == 'shallow' then
+        copy[key] = value
+      else
+        copy[copy_table(key)] = copy_table(value)
+      end
+    end
+    return setmetatable(copy, getmetatable(tbl))
+  else -- number, string, boolean, etc
+    return tbl
   end
-
-  return new
 end
+
+--- Create a copy of a test
+local copy_test = copy_table
 
 --- Create a modified test with the given default options
 local function apply_test_options (test, default_options)
@@ -362,15 +373,24 @@ function TestRunner:get_actual_doc (test)
     if filter == 'citeproc' then
       actual = utils.citeproc(actual)
     else
-      actual = utils.run_lua_filter(actual, filter)
+      -- Run the filters in a copy of the global environment,
+      -- but set FORMAT to the test's target format.
+      local env = copy_table(_G, 'shallow')
+      env.FORMAT = test.target_format
+      actual = utils.run_lua_filter(actual, filter, env)
     end
   end
 
   return actual
 end
 
-function TestRunner:get_expected_doc (test, accept)
-  assert(test.output, 'No expected output found in file ' .. test.filepath)
+--- Returns the expected document and, if specified, the target format.
+-- The third value indicates whether a document was found and parsed.
+function TestRunner:get_expected_doc (test)
+  if not test.output then
+    return 'No expected output found in file ' .. test.filepath, nil, false
+  end
+
   local output = test.output
   if output.t == 'CodeBlock' then
     local format = output.classes[1] or 'native'
@@ -378,13 +398,14 @@ function TestRunner:get_expected_doc (test, accept)
       format = 'native'
     end
     local exts = output.attributes.extensions or ''
-    return pandoc.read(output.text, format .. exts)
+    local ok, doc = pcall(pandoc.read, output.text, format .. exts)
+    return doc, format, ok
   elseif output.t == 'Div' and output.classes[1] == 'section' then
     local section_content = output.content:clone()
     section_content:remove(1)
-    return pandoc.Pandoc(section_content)
+    return pandoc.Pandoc(section_content), nil, true
   elseif output.t == 'Div' then
-    return pandoc.Pandoc(output.content)
+    return pandoc.Pandoc(output.content), nil, true
   else
     error("Don't know how to handle output block; aborting.")
   end
@@ -416,8 +437,12 @@ TestRunner.run_test = function (self, test, accept)
     return self:run_command_test(test, accept)
   end
 
+  local expected, format, ok = self:get_expected_doc(test, accept)
+  if not accept and not ok then
+    error('Could not get the expected Pandoc document:\n' .. expected)
+  end
+  test.target_format = format or test.target_format
   local actual   = self:get_actual_doc(test)
-  local expected = accept or self:get_expected_doc(test, accept)
 
   if actual == expected then
     return true
