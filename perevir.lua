@@ -354,7 +354,7 @@ function TestRunner:get_doc (block)
     if self.reader then
       return self.reader(text, block.attr)
     else
-      local format = block.classes[1] or 'markdown'
+      local format = block.attributes.format or block.classes[1] or 'markdown'
       local exts = block.attributes.extensions or ''
       -- pandoc gobbles the final newline in code blocks
       return pandoc.read(text, format .. exts)
@@ -393,7 +393,7 @@ function TestRunner:get_expected_doc (test)
 
   local output = test.output
   if output.t == 'CodeBlock' then
-    local format = output.classes[1] or 'native'
+    local format = output.attributes.format or output.classes[1] or 'native'
     if format == 'haskell' then
       format = 'native'
     end

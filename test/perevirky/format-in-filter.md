@@ -11,7 +11,7 @@ There's no input:
 
 but the output should include the target format (here: gfm)
 
-``` gfm {#output}
+``` markdown {#output format=gfm}
 ---
 format: gfm
 ---
