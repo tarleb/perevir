@@ -170,6 +170,31 @@ function Test.new (args)
 end
 
 ------------------------------------------------------------------------
+--- Checks for Block properties
+local BlockProperty = {
+  --- Checks whether a pandoc Block element contains the expected output.
+  is_output = function (block)
+    return block.identifier
+      and block.identifier:match '^out'
+      or block.identifier == 'expected'
+  end,
+
+  --- Checks whether a pandoc Block element contains the input.
+  is_input = function (block)
+    return block.identifier
+      and block.identifier:match'^input$'
+      or block.identifier:match'^in$'
+  end,
+
+  --- Checks whether a pandoc block is a command block
+  is_command = function (block)
+    return block.identifier
+      and block.identifier:match '^command$'
+  end,
+}
+
+
+------------------------------------------------------------------------
 --- Create Test objects from perevirky files.
 local TestParser = {}
 TestParser.__index = TestParser
@@ -178,31 +203,10 @@ TestParser.__index = TestParser
 function TestParser.new (opts)
   opts = opts or {}
   local newtp = {
-    is_output = opts.is_output,
-    is_input  = opts.is_input,
     format    = opts.format,
     reader    = opts.reader,
   }
   return setmetatable(newtp, TestParser)
-end
-
---- Checks whether a pandoc Block element contains the expected output.
-function TestParser.is_output (block)
-  return block.identifier
-    and block.identifier:match '^out'
-    or block.identifier == 'expected'
-end
-
---- Checks whether a pandoc Block element contains the input.
-function TestParser.is_input (block)
-  return block.identifier
-    and block.identifier:match'^input$'
-    or block.identifier:match'^in$'
-end
-
-function TestParser.is_command (block)
-  return block.identifier
-    and block.identifier:match '^command$'
 end
 
 --- Parses a test file into a Pandoc object.
@@ -224,18 +228,18 @@ function TestParser:get_test_blocks (doc)
 
   structure.make_sections(doc):walk{
     CodeBlock = function (cb)
-      if self.is_input(cb) then
+      if BlockProperty.is_input(cb) then
         set('input', cb)
-      elseif self.is_output(cb) then
+      elseif BlockProperty.is_output(cb) then
         set('output', cb)
-      elseif self.is_command(cb) then
+      elseif BlockProperty.is_command(cb) then
         set('command', cb)
       end
     end,
     Div = function (div)
-      if self.is_input(div) then
+      if BlockProperty.is_input(div) then
         set('input', div)
-      elseif self.is_output(div) then
+      elseif BlockProperty.is_output(div) then
         set('output', div)
       end
     end,
@@ -343,14 +347,14 @@ function TestRunner:accept (test, actual)
   local found_outblock = false
   testdoc = testdoc:walk{
     CodeBlock = function (cb)
-      if TestParser.is_output(cb) then
+      if BlockProperty.is_output(cb) then
         found_outblock = true
         cb.text = actual_str
         return cb
       end
     end,
     Div = function (div)
-      if TestParser.is_output(div) then
+      if BlockProperty.is_output(div) then
         assert(ptype(actual) == 'Pandoc', 'Actual value in test must be Pandoc')
         found_outblock = true
         div.content = actual.blocks
