@@ -327,7 +327,9 @@ function TestParser:get_test_blocks (doc)
     end,
   }
 
-  if blocks.input.t == 'Div' and blocks.input.classes[1] == 'section' then
+  if blocks.input and
+     blocks.input.t == 'Div' and
+     blocks.input.classes[1] == 'section' then
     local section = blocks.input:clone()
     section.content:remove(1)
     blocks.input = section
