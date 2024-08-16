@@ -132,17 +132,17 @@ end
 --- Test
 local Test = {
   filepath = false,            -- path to the test file
-  text     = '',               -- full text for this test
   doc      = pandoc.Pandoc{},  -- the full test document (Pandoc)
   options  = {},               -- test options
   input    = pandoc.Div{},     -- input code block or div
   output   = false,            -- expected output in CodeBlock or Div
   command  = false,            -- specific command to run on the input
-  actual   = false,            -- actual conversion result (Pandoc|false)
-  expected = false,            -- expected document result (Pandoc|false)
   target_format = nil,         -- the FORMAT value passed to filters
 }
 Test.__index = Test
+Test.__newindex = function (_, k, _)
+  error('Tryping to set the unknown field ' .. k .. ' on a Test object')
+end
 
 --- Get the format of the expected output.
 local function get_expected_format(out)
@@ -160,10 +160,10 @@ end
 
 --- Create a new Test.
 function Test.new (args)
-  local test = setmetatable(args, Test)
+  local test = args
   test.target_format = test.target_format or
     get_expected_format(test.output)
-  return test
+  return setmetatable(args, Test)
 end
 
 ------------------------------------------------------------------------
@@ -313,9 +313,7 @@ function TestRunner.new (opts)
 end
 
 --- Accept the actual document as correct and rewrite the test file.
-TestRunner.accept = function (self, test, test_factory)
-  test_factory = test_factory or TestParser.new()
-  local actual = test.actual
+function TestRunner:accept (test, actual)
   local filename = test.filepath
   local testdoc = test.doc
 
@@ -342,14 +340,14 @@ TestRunner.accept = function (self, test, test_factory)
   local found_outblock = false
   testdoc = testdoc:walk{
     CodeBlock = function (cb)
-      if test_factory.is_output(cb) then
+      if TestParser.is_output(cb) then
         found_outblock = true
         cb.text = actual_str
         return cb
       end
     end,
     Div = function (div)
-      if test_factory.is_output(div) then
+      if TestParser.is_output(div) then
         assert(ptype(actual) == 'Pandoc', 'Actual value in test must be Pandoc')
         found_outblock = true
         div.content = actual.blocks
@@ -385,18 +383,18 @@ TestRunner.diff = function (expected, actual)
 end
 
 --- Report a test failure
-function TestRunner:report_failure (test)
+function TestRunner:report_failure (test, expected, actual)
   io.stderr:write('Failed: ' .. test.filepath .. '\n')
-  assert(test.actual, "The actual result is missing from the test object")
-  assert(test.expected, "The expected result is missing from the test object")
+  assert(expected, "Expected result is required when reporting a test failure")
+  assert(actual, "Actual result is required when reporting a test failure")
 
   local opts = {}
-  if next(test.actual.meta) or (next(test.expected.meta)) then
+  if next(actual.meta) or (next(expected.meta)) then
     -- has metadata, use template
     opts.template = pandoc.template.default 'native'
   end
-  local actual_str   = pandoc.write(test.actual, 'native', opts)
-  local expected_str = pandoc.write(test.expected, 'native', opts)
+  local actual_str   = pandoc.write(actual, 'native', opts)
+  local expected_str = pandoc.write(expected, 'native', opts)
   io.stderr:write(self.diff(expected_str, actual_str))
   io.stderr:write('\n')
 end
@@ -469,9 +467,7 @@ function TestRunner:run_command_test (test, accept)
   if actual == expected then
     return true
   elseif accept then
-    test.actual   = actual
-    test.expected = expected
-    self:accept(test)
+    self:accept(test, actual)
     return true
   else
     io.stderr:write(self.diff(expected, actual))
@@ -503,14 +499,10 @@ TestRunner.run_test = function (self, test, accept)
   if actual == expected then
     return true
   elseif accept then
-    test.actual   = actual
-    test.expected = expected
-    self:accept(test)
+    self:accept(test, actual)
     return true
   else
-    test.actual   = actual
-    test.expected = expected
-    self:report_failure(test)
+    self:report_failure(test, expected, actual)
     return false
   end
 end
