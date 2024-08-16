@@ -160,10 +160,13 @@ end
 
 --- Create a new Test.
 function Test.new (args)
-  local test = args
+  local test = {}
+  for key in pairs(Test) do
+    test[key] = args[key]
+  end
   test.target_format = test.target_format or
     get_expected_format(test.output)
-  return setmetatable(args, Test)
+  return setmetatable(test, Test)
 end
 
 ------------------------------------------------------------------------
