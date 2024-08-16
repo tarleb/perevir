@@ -129,7 +129,45 @@ local function file_exists (filepath)
 end
 
 ------------------------------------------------------------------------
---- Test factory.
+--- Test
+local Test = {
+  filepath = false,            -- path to the test file
+  text     = '',               -- full text for this test
+  doc      = pandoc.Pandoc{},  -- the full test document (Pandoc)
+  options  = {},               -- test options
+  input    = pandoc.Div{},     -- input code block or div
+  output   = false,            -- expected output in CodeBlock or Div
+  command  = false,            -- specific command to run on the input
+  actual   = false,            -- actual conversion result (Pandoc|false)
+  expected = false,            -- expected document result (Pandoc|false)
+  target_format = nil,         -- the FORMAT value passed to filters
+}
+Test.__index = Test
+
+--- Get the format of the expected output.
+local function get_expected_format(out)
+  local default = 'native'
+  if not out or out.t ~= 'CodeBlock' then
+    return default, ''
+  else
+    local format = out.attributes.format or out.classes[1] or default
+    -- Using `haskell` as the highlighting language for native output
+    -- is so common that it makes sense to handle it as a special case.
+    return format == 'haskell' and 'native' or format,
+      out.attributes.extensions or ''
+  end
+end
+
+--- Create a new Test.
+function Test.new (args)
+  local test = setmetatable(args, Test)
+  test.target_format = test.target_format or
+    get_expected_format(test.output)
+  return test
+end
+
+------------------------------------------------------------------------
+--- Create Test objects from perevirky files.
 local TestParser = {}
 TestParser.__index = TestParser
 
@@ -212,18 +250,16 @@ end
 function TestParser:create_test (filepath)
   local text = select(2, mediabag.fetch(filepath))
   local doc = self:reader(text)
+  local options = doc.meta.perevir
   local input, output, command = self:get_test_blocks(doc)
-  return {
+  return Test.new{
     filepath = filepath,       -- path to the test file
     text     = text,           -- full text for this test
     doc      = doc,            -- the full test document (Pandoc)
-    options  = doc.meta.perevir or {}, -- test options
+    options  = options,        -- test options
     input    = input,          -- input code block or div
     output   = output,         -- expected string output
     command  = command,        -- specific command to run on the input
-    actual   = false,          -- actual conversion result (Pandoc|false)
-    expected = false,          -- expected document result (Pandoc|false)
-    target_format = 'native',  -- the FORMAT value passed to filters
   }
 end
 
@@ -406,18 +442,13 @@ end
 -- The third value indicates whether a document was found and parsed.
 function TestRunner:get_expected_doc (test)
   if not test.output then
-    return 'No expected output found in file ' .. test.filepath, nil, false
+    error('No expected output found in file ' .. test.filepath)
   end
 
   local output = test.output
   if output.t == 'CodeBlock' then
-    local format = output.attributes.format or output.classes[1] or 'native'
-    if format == 'haskell' then
-      format = 'native'
-    end
-    local exts = output.attributes.extensions or ''
-    local ok, doc = pcall(pandoc.read, output.text, format .. exts)
-    return doc, format, ok
+    local format, exts = test.target_format, output.attributes.extensions
+    return pandoc.read(output.text, format .. (exts or ''))
   elseif output.t == 'Div' and output.classes[1] == 'section' then
     local section_content = output.content:clone()
     section_content:remove(1)
@@ -455,13 +486,7 @@ TestRunner.run_test = function (self, test, accept)
     return self:run_command_test(test, accept)
   end
 
-  local expected, format, ok = self:get_expected_doc(test, accept)
-  if not accept and not ok then
-    error('Could not get the expected Pandoc document:\n' .. tostring(expected))
-  elseif not ok then
-    expected = nil
-  end
-  test.target_format = format or test.target_format
+  local expected = accept or self:get_expected_doc(test)
   local actual   = self:get_actual_doc(test)
   local modifier_filters = List{}
   if test.options['ignore-softbreaks'] then
