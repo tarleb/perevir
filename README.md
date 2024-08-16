@@ -169,6 +169,13 @@ supported:
     MetaString values, so this is particularly useful when
     the expected output contains a YAML metadata block.
 
+-   `compare`: set this to `strings` to compare the string output
+    instead of documents. Helpful for tests that use a lossy
+    output format to set the expected result.
+
+    This option is implied when using [command
+    tests](#command-tests).
+
 Example:
 
 ``` yaml
@@ -199,5 +206,6 @@ Command tests differ from other tests in that they compare the
 expected and actual output as strings. Other tests compare the
 respective pandoc documents as objects.
 
-This kind of test is particularly useful when testing writer
-features, which otherwise are difficult to check.
+This kind of test is an escape hatch, meant to be used when
+otherwise it's not possible to capture the transformation
+correctly.

@@ -128,6 +128,25 @@ local function file_exists (filepath)
   end
 end
 
+--- Stringify an output value.
+local function stringify_output (doc, format, exts)
+  local doctype = ptype(doc)
+  if doctype == 'string' then
+    return doc
+  elseif doctype == 'Pandoc' then
+    local writer_opts = {}
+    if next(doc.meta) then
+      -- has metadata, use template
+      writer_opts.template = pandoc.template.default(format)
+    end
+
+    return pandoc.write(doc, format .. exts, writer_opts)
+  else
+    error("Don't know how to stringify type " .. doctype)
+  end
+end
+
+
 ------------------------------------------------------------------------
 --- Test
 local Test = {
@@ -203,8 +222,6 @@ local Perevirka = {
   filepath = false,
   --- The full document
   doc = pandoc.Pandoc{},
-  --- The test that's defined by this
-  test = nil,
   --- Format in which the document is written to file.
   format = 'markdown-fenced_divs-simple_tables',
   syntax_modifiers = mod_syntax
@@ -222,7 +239,7 @@ function Perevirka:update_expected (expected_output, format, exts)
     CodeBlock = function (cb)
       if BlockProperty.is_output(cb) then
         found_outblock = true
-        cb.text = self:stringify_expected(expected_output, format, exts)
+        cb.text = stringify_output(expected_output, format, exts)
         return cb
       end
     end,
@@ -237,26 +254,8 @@ function Perevirka:update_expected (expected_output, format, exts)
   if found_outblock then
     self.doc = newdoc
   else
-    local docstring = self:stringify_expected(expected_output)
+    local docstring = stringify_output(expected_output, format, exts)
     self.doc.blocks:insert(pandoc.CodeBlock(docstring, {'expected'}))
-  end
-end
-
---- Stringify an expected value.
-function Perevirka:stringify_expected (doc, format, exts)
-  local doctype = ptype(doc)
-  if doctype == 'string' then
-    return doc
-  elseif doctype == 'Pandoc' then
-    local writer_opts = {}
-    if next(doc.meta) then
-      -- has metadata, use template
-      writer_opts.template = pandoc.template.default(format)
-    end
-
-    return pandoc.write(doc, format .. exts, writer_opts)
-  else
-    error("Don't know how to stringify type " .. doctype)
   end
 end
 
@@ -344,7 +343,6 @@ function TestParser:create_test (filepath)
   local input, output, command = self:get_test_blocks(doc)
   return Test.new{
     filepath = filepath,       -- path to the test file
-    text     = text,           -- full text for this test
     doc      = doc,            -- the full test document (Pandoc)
     options  = options,        -- test options
     input    = input,          -- input code block or div
@@ -502,6 +500,11 @@ function TestRunner:run_command_test (test, accept)
   local input_str = test.input.text
   local actual = pandoc.pipe('pandoc', pandoc_args, input_str)
   local expected = test.output.text .. '\n'
+  return self:assert_equal(test, expected, actual, accept)
+end
+
+--- Assert that two strings are equal.
+function TestRunner:assert_equal (test, expected, actual, accept)
   if actual == expected then
     return true
   elseif accept then
@@ -514,12 +517,15 @@ function TestRunner:run_command_test (test, accept)
   end
 end
 
---- Run the test in the given file.
-TestRunner.run_test = function (self, test, accept)
-  if test.command then
-    return self:run_command_test(test, accept)
-  end
+--- Run a test, but compare the string output instead of the documents.
+function TestRunner:run_string_test (test, accept)
+  local format, exts = test.target_format, test.target_extensions
+  local expected = accept or test.output.text
+  local actual = stringify_output(self:get_actual_doc(test), format, exts)
+  return self:assert_equal(test, expected, actual, accept)
+end
 
+function TestRunner:get_expected_and_actual (test, accept)
   local expected = accept or self:get_expected_doc(test)
   local actual   = self:get_actual_doc(test)
   local modifier_filters = List{}
@@ -533,6 +539,18 @@ TestRunner.run_test = function (self, test, accept)
     actual = actual:walk(modfilter)
     expected = expected and expected:walk(modfilter)
   end
+  return expected, actual
+end
+
+--- Run the test in the given file.
+TestRunner.run_test = function (self, test, accept)
+  if test.command then
+    return self:run_command_test(test, accept)
+  elseif test.options.compare and
+         utils.stringify(test.options.compare) == 'strings' then
+    return self:run_string_test(test, accept)
+  end
+  local expected, actual = self:get_expected_and_actual(test, accept)
 
   if actual == expected then
     return true
