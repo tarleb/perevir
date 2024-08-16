@@ -457,7 +457,9 @@ TestRunner.run_test = function (self, test, accept)
 
   local expected, format, ok = self:get_expected_doc(test, accept)
   if not accept and not ok then
-    error('Could not get the expected Pandoc document:\n' .. expected)
+    error('Could not get the expected Pandoc document:\n' .. tostring(expected))
+  elseif not ok then
+    expected = nil
   end
   test.target_format = format or test.target_format
   local actual   = self:get_actual_doc(test)
@@ -470,7 +472,7 @@ TestRunner.run_test = function (self, test, accept)
   end
   for _, modfilter in ipairs(modifier_filters) do
     actual = actual:walk(modfilter)
-    expected = expected:walk(modfilter)
+    expected = expected and expected:walk(modfilter)
   end
 
   if actual == expected then
