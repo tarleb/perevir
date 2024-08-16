@@ -137,7 +137,8 @@ local Test = {
   input    = pandoc.Div{},     -- input code block or div
   output   = false,            -- expected output in CodeBlock or Div
   command  = false,            -- specific command to run on the input
-  target_format = nil,         -- the FORMAT value passed to filters
+  target_format = 'native',    -- the FORMAT value passed to filters
+  target_extensions = '',      -- the format extensions used for the output
 }
 Test.__index = Test
 Test.__newindex = function (_, k, _)
@@ -164,8 +165,11 @@ function Test.new (args)
   for key in pairs(Test) do
     test[key] = args[key]
   end
-  test.target_format = test.target_format or
-    get_expected_format(test.output)
+  local format, exts = get_expected_format(test.output)
+  test.target_format = test.target_format or format
+  test.target_extension = test.target_extensions or exts
+  -- Quick sanity check
+  assert(test.input, 'No input found in test ' .. test.filepath or '<unnamed>')
   return setmetatable(test, Test)
 end
 
@@ -193,6 +197,85 @@ local BlockProperty = {
   end,
 }
 
+------------------------------------------------------------------------
+--- A test embedded in a pandoc document.
+local Perevirka = {
+  filepath = false,
+  --- The full document
+  doc = pandoc.Pandoc{},
+  --- The test that's defined by this
+  test = nil,
+  --- Format in which the document is written to file.
+  format = 'markdown-fenced_divs-simple_tables',
+  syntax_modifiers = mod_syntax
+}
+Perevirka.__index = Perevirka
+Perevirka.new = function (filepath, doc, format)
+  local perevirka = {filepath = filepath, doc = doc, format = format}
+  return setmetatable(perevirka, Perevirka)
+end
+
+--- Update the expected output in the document.
+function Perevirka:update_expected (expected_output, format, exts)
+  local found_outblock = false
+  local newdoc = self.doc:walk{
+    CodeBlock = function (cb)
+      if BlockProperty.is_output(cb) then
+        found_outblock = true
+        cb.text = self:stringify_expected(expected_output, format, exts)
+        return cb
+      end
+    end,
+    Div = function (div)
+      if BlockProperty.is_output(div) then
+        found_outblock = true
+        div.content = expected_output.blocks
+        return div
+      end
+    end
+  }
+  if found_outblock then
+    self.doc = newdoc
+  else
+    local docstring = self:stringify_expected(expected_output)
+    self.doc.blocks:insert(pandoc.CodeBlock(docstring, {'expected'}))
+  end
+end
+
+--- Stringify an expected value.
+function Perevirka:stringify_expected (doc, format, exts)
+  local doctype = ptype(doc)
+  if doctype == 'string' then
+    return doc
+  elseif doctype == 'Pandoc' then
+    local writer_opts = {}
+    if next(doc.meta) then
+      -- has metadata, use template
+      writer_opts.template = pandoc.template.default(format)
+    end
+
+    return pandoc.write(doc, format .. exts, writer_opts)
+  else
+    error("Don't know how to stringify type " .. doctype)
+  end
+end
+
+--- Write the perevirka back to file.
+function Perevirka:write ()
+  --- Writer options to use when writing the document.
+  local writer_opts = pandoc.WriterOptions{
+    wrap_text = 'preserve',
+    template = template.default 'markdown',
+  }
+  local content = pandoc.write(
+    self.doc:walk(mod_syntax),
+    self.format,
+    writer_opts
+  )
+  local fh = io.open(self.filepath, 'w')
+  fh:write(content)
+  fh:close()
+end
 
 ------------------------------------------------------------------------
 --- Create Test objects from perevirky files.
@@ -313,66 +396,15 @@ TestRunner.__index = TestRunner
 
 function TestRunner.new (opts)
   opts = opts or {}
-  local newtr = {
-    reader = opts.reader
-  }
-  return setmetatable(newtr, TestRunner)
+  return setmetatable({reader = opts.reader}, TestRunner)
 end
 
 --- Accept the actual document as correct and rewrite the test file.
 function TestRunner:accept (test, actual)
-  local filename = test.filepath
-  local testdoc = test.doc
-
-  local actual_str
-
-  if ptype(actual) == 'string' then
-    actual_str = actual
-  else
-    local writer_opts = {}
-    local format = test.output.classes[1] or 'native'
-    if format == 'haskell' then
-      format = 'native'
-    end
-    local exts = test.output.attributes.extensions or ''
-
-    if ptype(actual) == 'Pandoc' and next(actual.meta) then
-      -- has metadata, use template
-      writer_opts.template = pandoc.template.default(format)
-    end
-
-    actual_str = pandoc.write(actual, format .. exts, writer_opts)
-  end
-
-  local found_outblock = false
-  testdoc = testdoc:walk{
-    CodeBlock = function (cb)
-      if BlockProperty.is_output(cb) then
-        found_outblock = true
-        cb.text = actual_str
-        return cb
-      end
-    end,
-    Div = function (div)
-      if BlockProperty.is_output(div) then
-        assert(ptype(actual) == 'Pandoc', 'Actual value in test must be Pandoc')
-        found_outblock = true
-        div.content = actual.blocks
-        return div
-      end
-    end
-  }
-  if not found_outblock then
-    testdoc.blocks:insert(pandoc.CodeBlock(actual_str, {'expected'}))
-  end
-  local md_writer_opts = {
-    template = template.default 'markdown',
-    wrap_text = 'preserve',
-  }
-  local fh = io.open(filename, 'w')
-  local out_format = 'markdown-fenced_divs-simple_tables'
-  fh:write(pandoc.write(testdoc:walk(mod_syntax), out_format, md_writer_opts))
-  fh:close()
+  local format, exts = test.target_format, test.target_extensions
+  local perevirka = Perevirka.new(test.filepath, test.doc)
+  perevirka:update_expected(actual, format, exts)
+  perevirka:write()
 end
 
 TestRunner.diff = function (expected, actual)
@@ -423,7 +455,6 @@ function TestRunner:get_doc (block)
 end
 
 function TestRunner:get_actual_doc (test)
-  assert(test.input, 'No input found in test file ' .. test.filepath)
   local actual = self:get_doc(test.input)
   local filters = test.options.filters
     and test.options.filters:map(utils.stringify)
