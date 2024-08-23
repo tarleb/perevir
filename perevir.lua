@@ -607,9 +607,16 @@ TestGroup.from_path = function (filepath, test_from_file)
     end
   end
 
-  local options = optionsfile
-    and pandoc.read(read_file(optionsfile)).meta
-    or {}
+  local options = {}
+  if optionsfile then
+    local yaml = read_file(optionsfile)
+    -- Ensure the yaml starts and ends with YAML markers
+    yaml = (not yaml:match '^%-%-%-\n') and '---\n' .. yaml or yaml
+    yaml = (not yaml:match '\n%-%-%-%s*$')
+      and yaml:gsub('%s*$', '\n---\n')
+      or yaml
+    options = pandoc.read(yaml).meta
+  end
   return TestGroup.new(testfiles:map(test_from_file), options)
 end
 
