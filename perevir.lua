@@ -187,9 +187,13 @@ function Test.new (args)
   local format, exts = get_expected_format(test.output)
   test.target_format = test.target_format or format
   test.target_extension = test.target_extensions or exts
+  setmetatable(test, Test)
   -- Quick sanity check
-  assert(test.input, 'No input found in test ' .. test.filepath or '<unnamed>')
-  return setmetatable(test, Test)
+  if not test.options.disable then
+    assert(test.input,
+           'No input found in test ' .. test.filepath or '<unnamed>')
+  end
+  return test
 end
 
 ------------------------------------------------------------------------
@@ -546,7 +550,10 @@ end
 
 --- Run the test in the given file.
 TestRunner.run_test = function (self, test, accept)
-  if test.command then
+  if test.options.disable then
+    -- An ignored test is neither true nor false
+    return nil
+  elseif test.command then
     return self:run_command_test(test, accept)
   elseif test.options.compare and
          utils.stringify(test.options.compare) == 'strings' then
@@ -570,7 +577,7 @@ function TestRunner:run_test_group (testgroup, accept)
   local success = true
   for _, test in ipairs(testgroup.tests) do
     local localtest = apply_test_options(test, testgroup.options)
-    success = self:run_test(localtest, accept) and success
+    success = (self:run_test(localtest, accept) ~= false) and success
   end
 
   return success

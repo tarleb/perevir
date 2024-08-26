@@ -159,6 +159,8 @@ Perevir can be configured by setting values below the `perevir`
 metadata field. Currently only the following options are
 supported:
 
+-   `disable`: do not run perevir checks on this file.
+
 -   `filters`: it takes a list of filters that are run on the input.
 
 -   `ignore-softbreaks`: treat softbreaks as spaces, meaning that
