@@ -154,7 +154,7 @@ local Test = {
   doc      = pandoc.Pandoc{},  -- the full test document (Pandoc)
   options  = {},               -- test options
   input    = pandoc.Div{},     -- input code block or div
-  output   = false,            -- expected output in CodeBlock or Div
+  outputs  = List{},           -- expected outputs; CodeBlock or Div elements
   command  = false,            -- specific command to run on the input
   target_format = 'native',    -- the FORMAT value passed to filters
   target_extensions = '',      -- the format extensions used for the output
@@ -200,6 +200,7 @@ local BlockProperty = {
     return block.identifier
       and block.identifier:match '^out'
       or block.identifier == 'expected'
+      or block.classes:includes('expected')
   end,
 
   --- Checks whether a pandoc Block element contains the input.
@@ -232,21 +233,21 @@ Perevirka.new = function (filepath, doc, format)
   return setmetatable(perevirka, Perevirka)
 end
 
---- Update the expected output in the document.
-function Perevirka:update_expected (expected_output, format, exts)
+--- Update the expected outputs in the document.
+function Perevirka:update_expected (expected_outputs, format, exts)
   local found_outblock = false
   local newdoc = self.doc:walk{
     CodeBlock = function (cb)
       if BlockProperty.is_output(cb) then
         found_outblock = true
-        cb.text = stringify_output(expected_output, format, exts)
+        cb.text = stringify_output(expected_outputs:remove(), format, exts)
         return cb
       end
     end,
     Div = function (div)
       if BlockProperty.is_output(div) then
         found_outblock = true
-        div.content = expected_output.blocks
+        div.content = expected_outputs:remove().blocks
         return div
       end
     end
@@ -254,7 +255,7 @@ function Perevirka:update_expected (expected_output, format, exts)
   if found_outblock then
     self.doc = newdoc
   else
-    local docstring = stringify_output(expected_output, format, exts)
+    local docstring = stringify_output(expected_outputs:remove(), format, exts)
     self.doc.blocks:insert(pandoc.CodeBlock(docstring, {'expected'}))
   end
 end
@@ -301,14 +302,21 @@ function TestParser:get_test_blocks (doc)
   local blocks = {}
 
   local function set (kind, block)
-    if blocks[kind] then
+    if blocks[kind] and kind == 'output' then
+      blocks[kind] = List{block}
+    elseif blocks[kind] then
       error('Found two potential ' .. kind .. ' blocks, bailing out.')
     else
-      blocks[kind] = block
+      if kind == 'output' then
+        blocks[kind]:insert(block)
+      else
+        blocks[kind] = block
+      end
     end
   end
 
   structure.make_sections(doc):walk{
+    traverse = 'topdown',
     CodeBlock = function (cb)
       if BlockProperty.is_input(cb) then
         set('input', cb)
@@ -403,7 +411,7 @@ end
 function TestRunner:accept (test, actual)
   local format, exts = test.target_format, test.target_extensions
   local perevirka = Perevirka.new(test.filepath, test.doc)
-  perevirka:update_expected(actual, format, exts)
+  perevirka:update_expected(List{actual}, format, exts)
   perevirka:write()
 end
 
@@ -476,12 +484,10 @@ end
 
 --- Returns the expected document and, if specified, the target format.
 -- The third value indicates whether a document was found and parsed.
-function TestRunner:get_expected_doc (test)
-  if not test.output then
+function TestRunner:get_expected_doc (output)
+  if not next(test.outputs) then
     error('No expected output found in file ' .. test.filepath)
   end
-
-  local output = test.output
   if output.t == 'CodeBlock' then
     local format, exts = test.target_format, output.attributes.extensions
     return pandoc.read(output.text, format .. (exts or ''))
