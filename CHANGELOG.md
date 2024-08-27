@@ -4,6 +4,36 @@ Perevir is versioned using [Semantic Versioning][].
 
 [Semantic Versioning]: https://semver.org/
 
+## v0.3.0
+
+Released 2024-08-27.
+
+- Added new configuration options:
+
+    + `disabled`: disable specific perevirky
+    + `ignore-softbreaks`: treat softbreaks as spaces
+    + `metastrings-to-inlines`: pretend that MetaString elements
+      are MetaInlines.
+    + `compare`: selectively compare the raw string output, not
+      the parsed pandoc ASTs.
+
+  See the documentation for details.
+
+- Support directory-wide configs via `perevir.yaml` files.
+
+- Add support for `citeproc` as a special filter.
+
+- Allow any format that pandoc can read to be used in expected
+  blocks. This can differ from the highlighting language and can
+  have extensions set via the `extensions` attribute.
+
+- Make the target format available to Lua filters (via the
+  `FORMAT` global).
+
+- Various code improvements and bug fixes.
+
+- Documentation improvements.
+
 ## v0.2.0
 
 Released 2024-07-22.
