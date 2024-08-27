@@ -2,6 +2,7 @@
 		test-%
 		test-acceptance \
 		test-diroptions \
+		test-disabled \
 		test-filter \
 		test-ignore-softbreaks \
 		test-sections \
@@ -10,6 +11,7 @@
 test: \
 		test-acceptance \
 		test-diroptions \
+		test-disabled \
 		test-filter \
 		test-ignore-softbreaks \
 		test-sections \
