@@ -543,7 +543,9 @@ function TestRunner:get_expected_and_actual (test, accept)
   end
   for _, modfilter in ipairs(modifier_filters) do
     actual = actual:walk(modfilter)
-    expected = expected and expected:walk(modfilter)
+    expected = ptype(expected) == 'Pandoc'
+      and expected:walk(modfilter)
+      or expected
   end
   return expected, actual
 end
