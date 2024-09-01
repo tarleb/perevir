@@ -2,20 +2,24 @@
 		test-%
 		test-acceptance \
 		test-diroptions \
-		test-disabled \
-		test-filter \
-		test-ignore-softbreaks \
-		test-sections \
 		test-custom-reader
 
 test: \
 		test-acceptance \
+		test-custom-reader \
 		test-diroptions \
+		test-check-filter \
+		test-citeproc \
+		test-compare-strings \
 		test-disabled \
-		test-filter \
+		test-emphasis \
+		test-expected-in-div \
+		test-format-in-filter \
 		test-ignore-softbreaks \
-		test-sections \
-		test-custom-reader
+		test-math \
+		test-metastrings-to-inlines \
+		test-output-in-html \
+		test-sections
 	@pandoc-lua test/md-checker.lua test/perevirky/emphasis.md
 	@if pandoc-lua test/md-checker.lua test/perevirky/failure.md 2>/dev/null; then \
 	    exit 1; \
@@ -23,9 +27,6 @@ test: \
 
 test-acceptance:
 	@test/accept/check-acceptance.sh test/accept/failure.md test/accept/accepted.md
-
-test-filter:
-	@pandoc-lua perevir.lua test/perevirky/check-filter.md
 
 test-diroptions:
 	@pandoc-lua perevir.lua test/dir-options/smallcaps.md
