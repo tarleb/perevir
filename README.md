@@ -135,9 +135,11 @@ more robust.
 
 ### Input and output divs
 
-Normal (pandoc Markdown) text is generally easier and more
-pleasant to read than codeblocks with markup. It is therefore
-possible to use divs to set the input or expected output.
+Perevirky files can be viewed as rendered Markdown files on
+platforms like GitHub, GitLab, Codeberg, etc.  Rendered (Markdown)
+text is generally easier and more pleasant to read on than
+codeblocks with markup. It is therefore possible to use divs to
+set the input or expected output.
 
 ```` markdown
 <div id="input">
