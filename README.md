@@ -29,6 +29,9 @@ double as easily accessible and always up-to-date documentation.
 Installation
 ------------
 
+Perevir depends on pandoc 3.2.1 or later. It also requires a
+working `diff` executable in the path to report errors.
+
 The tool is a single file and thus easy to install. Just download
 `perevir.lua` and call it with `pandoc lua perevir.lua
 <TESTFILE>`.
