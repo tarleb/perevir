@@ -425,23 +425,6 @@ TestRunner.diff = function (expected, actual)
   end)
 end
 
---- Report a test failure
-function TestRunner:report_failure (test, expected, actual)
-  io.stderr:write('Failed: ' .. test.filepath .. '\n')
-  assert(expected, "Expected result is required when reporting a test failure")
-  assert(actual, "Actual result is required when reporting a test failure")
-
-  local opts = {}
-  if next(actual.meta) or (next(expected.meta)) then
-    -- has metadata, use template
-    opts.template = pandoc.template.default 'native'
-  end
-  local actual_str   = pandoc.write(actual, 'native', opts)
-  local expected_str = pandoc.write(expected, 'native', opts)
-  io.stderr:write(self.diff(expected_str, actual_str))
-  io.stderr:write('\n')
-end
-
 function TestRunner:get_doc (block)
   if block.t == 'CodeBlock' then
     local text = block.text .. '\n\n'
@@ -480,13 +463,12 @@ end
 
 --- Returns the expected document and, if specified, the target format.
 -- The third value indicates whether a document was found and parsed.
+-- Returns nil if the perevirka does not specify the expected output.
 function TestRunner:get_expected_doc (test)
-  if not test.output then
-    error('No expected output found in file ' .. test.filepath)
-  end
-
   local output = test.output
-  if output.t == 'CodeBlock' then
+  if not output then
+    return nil
+  elseif output.t == 'CodeBlock' then
     local format, exts = test.target_format, output.attributes.extensions
     return pandoc.read(output.text, format .. (exts or ''))
   elseif output.t == 'Div' and output.classes[1] == 'section' then
@@ -500,27 +482,13 @@ function TestRunner:get_expected_doc (test)
   end
 end
 
-function TestRunner:run_command_test (test, accept)
+function TestRunner:run_command_test (test)
   local pandoc_args = split(test.command.text)
   assert(pandoc_args:remove(1) == 'pandoc', 'Must be a pandoc command.')
   local input_str = test.input.text
   local actual = pandoc.pipe('pandoc', pandoc_args, input_str)
   local expected = test.output.text .. '\n'
-  return self:assert_equal(test, expected, actual, accept)
-end
-
---- Assert that two strings are equal.
-function TestRunner:assert_equal (test, expected, actual, accept)
-  if actual == expected then
-    return true
-  elseif accept then
-    self:accept(test, actual)
-    return true
-  else
-    io.stderr:write(self.diff(expected, actual))
-    io.stderr:write('\n')
-    return false
-  end
+  return expected, actual
 end
 
 --- Run a test, but compare the string output instead of the documents.
@@ -528,11 +496,11 @@ function TestRunner:run_string_test (test, accept)
   local format, exts = test.target_format, test.target_extensions
   local expected = accept or test.output.text
   local actual = stringify_output(self:get_actual_doc(test), format, exts)
-  return self:assert_equal(test, expected, actual, accept)
+  return expected, actual
 end
 
-function TestRunner:get_expected_and_actual (test, accept)
-  local expected = accept or self:get_expected_doc(test)
+function TestRunner:get_expected_and_actual (test)
+  local expected = self:get_expected_doc(test)
   local actual   = self:get_actual_doc(test)
   local modifier_filters = List{}
   if test.options['ignore-softbreaks'] then
@@ -552,26 +520,52 @@ end
 
 --- Run the test in the given file.
 TestRunner.run_test = function (self, test, accept)
+  io.stdout:write(test.filepath)
+  io.stdout:write(':' .. string.rep(' ', math.max(1, 55 - #test.filepath)))
+  local result = nil
+  local expected, actual, expected_str, actual_str
   if test.options.disable then
     -- An ignored test is neither true nor false
-    return nil
+    result = nil
   elseif test.command then
-    return self:run_command_test(test, accept)
+    expected_str, actual_str = self:run_command_test(test)
+    result = expected_str == actual_str
   elseif test.options.compare and
          utils.stringify(test.options.compare) == 'strings' then
-    return self:run_string_test(test, accept)
+    expected_str, actual_str = self:run_string_test(test, accept)
+    result = expected_str == actual_str
+  else
+    expected, actual = self:get_expected_and_actual(test)
+    result = actual == expected
+    -- stringify actual and expected
+    if not result then
+      local opts = {}
+      if next(actual.meta) or (expected and next(expected.meta)) then
+        -- has metadata, use template
+        opts.template = pandoc.template.default 'native'
+      end
+      actual_str   = pandoc.write(actual, 'native', opts)
+      expected_str = expected
+        and pandoc.write(expected, 'native', opts)
+        or actual_str
+    end
   end
-  local expected, actual = self:get_expected_and_actual(test, accept)
 
-  if actual == expected then
-    return true
+  if result == true then
+    io.stdout:write('OK\n')
+  elseif result == nil then
+    -- Disabled test
+    io.stdout:write('DISABLED\n')
   elseif accept then
     self:accept(test, actual)
-    return true
+    io.stdout:write('ACCEPTED\n')
   else
-    self:report_failure(test, expected, actual)
-    return false
+    io.stdout:write('FAILED\n')
+    io.stderr:write(self.diff(expected_str, actual_str))
+    io.stderr:write('\n')
   end
+
+  return accept and true or result
 end
 
 --- Run all tests in a test group
