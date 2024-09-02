@@ -4,6 +4,17 @@ Perevir is versioned using [Semantic Versioning][].
 
 [Semantic Versioning]: https://semver.org/
 
+## v0.4.0
+
+Released 2024-09-02.
+
+- Test results are now reported to stdout.
+
+- Fixed a bug that prevented to "accept" a result if there was no
+  output block in the perevirka.
+
+- Minor documentation improvements.
+
 ## v0.3.0
 
 Released 2024-08-27.
