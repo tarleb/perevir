@@ -74,7 +74,7 @@ file will be modified in-place.
 Perevirky (test files)
 ----------------------
 
-All perevirky much have two parts: *input* and *expected output*.
+All perevirky have two parts: *input* and *expected output*.
 Each of these parts is marked by setting an appropriate element
 ID: `input` for the input and `expected` or `output` for the
 expected result.
@@ -133,14 +133,14 @@ extension when parsing the input, one might write
 Perevir reads the input and output blocks into pandoc's internal
 document format. The tests checking the conversion results use the
 objects of that internal format, **not** the string
-representation. This improves accuracy and also makes tests
+representation (unless requested). This improves accuracy and also makes tests
 more robust.
 
 ### Input and output divs
 
 Perevirky files can be viewed as rendered Markdown files on
 platforms like GitHub, GitLab, Codeberg, etc.  Rendered (Markdown)
-text is generally easier and more pleasant to read on than
+text is generally easier and more pleasant to read than
 codeblocks with markup. It is therefore possible to use divs to
 set the input or expected output.
 
@@ -153,7 +153,7 @@ paragraph.
 </div>
 ````
 
-It is advisable to use HTML divs instead of pandoc's own fenced
+It is advisable to use HTML div tags instead of pandoc's own fenced
 divs syntax, as fenced divs are not supported on most development
 platforms and perevirky become less readable when viewed there.
 Perevir disables fenced divs when rewriting perevirky with `-a`.
@@ -161,7 +161,7 @@ Perevir disables fenced divs when rewriting perevirky with `-a`.
 ### Options
 
 Perevir can be configured by setting values below the `perevir`
-metadata field. Currently only the following options are
+metadata field. The following options are
 supported:
 
 -   `disable`: do not run perevir checks on this file.
@@ -176,7 +176,7 @@ supported:
     MetaString values, so this is particularly useful when
     the expected output contains a YAML metadata block.
 
--   `compare`: set this to `strings` to compare the string output
+-   `compare`: set this to `strings` to compare string outputs
     instead of documents. Helpful for tests that use a lossy
     output format to set the expected result.
 
