@@ -398,9 +398,33 @@ end
 local TestRunner = {}
 TestRunner.__index = TestRunner
 
+--- map from formats to readers and writers
+TestRunner.ioformats = {
+  read = {
+    haskell = 'native',
+  },
+  write = {
+    haskell = 'native',
+  }
+}
+
 function TestRunner.new (opts)
   opts = opts or {}
-  return setmetatable({reader = opts.reader}, TestRunner)
+  local ioformats = opts.ioformats
+  if opts.reader then
+    ioformats = ioformats or {}
+    -- always return the reader for unknown input formats
+    ioformats.read = setmetatable(ioformats, {
+        __index = function()
+          return opts.reader
+        end
+    })
+  end
+
+  return setmetatable(
+    {ioformats = ioformats},
+    TestRunner
+  )
 end
 
 --- Accept the actual document as correct and rewrite the test file.
@@ -409,6 +433,21 @@ function TestRunner:accept (test, actual)
   local perevirka = Perevirka.new(test.filepath, test.doc)
   perevirka:update_expected(actual, format, exts)
   perevirka:write()
+end
+
+function TestRunner:get_reader(format)
+  local reader = (self.ioformats.read or {})[format] or 'markdown'
+  if type(reader) == 'function' then
+    return reader
+  elseif type(reader) == 'string' then
+    -- use pandoc's read function
+    return function (input, attr)
+      local exts = attr.attributes.extensions or ''
+      return pandoc.read(input, format .. exts)
+    end
+  else
+    error('Unknown reader specifier: ' .. tostring(reader))
+  end
 end
 
 TestRunner.diff = function (expected, actual)
@@ -427,16 +466,11 @@ end
 
 function TestRunner:get_doc (block)
   if block.t == 'CodeBlock' then
+    -- pandoc gobbles the final newline in code blocks
     local text = block.text .. '\n\n'
-
-    if self.reader then
-      return self.reader(text, block.attr)
-    else
-      local format = block.attributes.format or block.classes[1] or 'markdown'
-      local exts = block.attributes.extensions or ''
-      -- pandoc gobbles the final newline in code blocks
-      return pandoc.read(text, format .. exts)
-    end
+    local format = block.attributes.format or block.classes[1] or 'markdown'
+    local reader = self:get_reader(format)
+    return reader(text, block.attr)
   end
   return pandoc.Pandoc(block.content)
 end
