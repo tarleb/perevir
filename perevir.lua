@@ -128,24 +128,6 @@ local function file_exists (filepath)
   end
 end
 
---- Stringify an output value.
-local function stringify_output (doc, format, exts)
-  local doctype = ptype(doc)
-  if doctype == 'string' then
-    return doc
-  elseif doctype == 'Pandoc' then
-    local writer_opts = {}
-    if next(doc.meta) then
-      -- has metadata, use template
-      writer_opts.template = pandoc.template.default(format)
-    end
-
-    return pandoc.write(doc, format .. exts, writer_opts)
-  else
-    error("Don't know how to stringify type " .. doctype)
-  end
-end
-
 
 ------------------------------------------------------------------------
 --- Test
@@ -237,13 +219,13 @@ Perevirka.new = function (filepath, doc, format)
 end
 
 --- Update the expected output in the document.
-function Perevirka:update_expected (expected_output, format, exts)
+function Perevirka:update_expected (expected_output, write)
   local found_outblock = false
   local newdoc = self.doc:walk{
     CodeBlock = function (cb)
       if BlockProperty.is_output(cb) then
         found_outblock = true
-        cb.text = stringify_output(expected_output, format, exts)
+        cb.text = write(expected_output, cb.attr)
         return cb
       end
     end,
@@ -258,7 +240,7 @@ function Perevirka:update_expected (expected_output, format, exts)
   if found_outblock then
     self.doc = newdoc
   else
-    local docstring = stringify_output(expected_output, format, exts)
+    local docstring = write(expected_output)
     self.doc.blocks:insert(pandoc.CodeBlock(docstring, {'expected'}))
   end
 end
@@ -427,16 +409,8 @@ function TestRunner.new (opts)
   )
 end
 
---- Accept the actual document as correct and rewrite the test file.
-function TestRunner:accept (test, actual)
-  local format, exts = test.target_format, test.target_extensions
-  local perevirka = Perevirka.new(test.filepath, test.doc)
-  perevirka:update_expected(actual, format, exts)
-  perevirka:write()
-end
-
 function TestRunner:get_reader(format)
-  local reader = (self.ioformats.read or {})[format] or 'markdown'
+  local reader = (self.ioformats.read or {})[format] or format
   if type(reader) == 'function' then
     return reader
   elseif type(reader) == 'string' then
@@ -448,6 +422,43 @@ function TestRunner:get_reader(format)
   else
     error('Unknown reader specifier: ' .. tostring(reader))
   end
+end
+
+--- Returns a function that stringifies an expect document value.
+function TestRunner:get_writer(format)
+  local writer = (self.ioformats.write or {})[format] or format
+  if type(writer) == 'function' then
+    return writer
+  elseif type(writer) == 'string' then
+    -- use pandoc's write function
+    return function (doc, attr)
+      attr = attr or pandoc.Attr()
+      local exts = attr.attributes.extensions or ''
+      local doctype = ptype(doc)
+      if doctype == 'string' then
+        return doc
+      elseif doctype == 'Pandoc' then
+        local writer_opts = {}
+        if next(doc.meta) then
+          -- has metadata, use template
+          writer_opts.template = pandoc.template.default(format)
+        end
+        return pandoc.write(doc, format .. exts, writer_opts)
+      else
+        error("Don't know how to stringify type " .. doctype)
+      end
+    end
+  else
+    error('Unknown reader specifier: ' .. tostring(writer))
+  end
+end
+
+--- Accept the actual document as correct and rewrite the test file.
+function TestRunner:accept (test, actual)
+  local write = self:get_writer(test.target_format)
+  local perevirka = Perevirka.new(test.filepath, test.doc)
+  perevirka:update_expected(actual, write)
+  perevirka:write()
 end
 
 TestRunner.diff = function (expected, actual)
@@ -529,7 +540,8 @@ end
 function TestRunner:run_string_test (test, accept)
   local format, exts = test.target_format, test.target_extensions
   local expected = accept or test.output.text
-  local actual = stringify_output(self:get_actual_doc(test), format, exts)
+  local write = self:get_writer(format)
+  local actual = write(self:get_actual_doc(test))
   return expected, actual
 end
 

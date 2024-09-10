@@ -1,12 +1,14 @@
 .PHONY: test \
 		test-%
 		test-acceptance \
-		test-diroptions \
-		test-custom-reader
+		test-custom-reader \
+		test-custom-writer \
+		test-diroptions
 
 test: \
 		test-acceptance \
 		test-custom-reader \
+		test-custom-writer \
 		test-diroptions \
 		test-check-filter \
 		test-citeproc \
@@ -34,6 +36,10 @@ test-diroptions:
 
 test-custom-reader:
 	@pandoc-lua test/plain-checker.lua test/perevirky/plain.md
+
+test-custom-writer:
+	@pandoc-lua test/custom-writer/custom-tester.lua \
+	    test/custom-writer/custom-writer-perevirka.md
 
 test-%:
 	@pandoc-lua perevir.lua test/perevirky/$*.md
