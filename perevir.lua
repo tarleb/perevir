@@ -219,13 +219,13 @@ Perevirka.new = function (filepath, doc, format)
 end
 
 --- Update the expected output in the document.
-function Perevirka:update_expected (expected_output, write)
+function Perevirka:update_expected (expected_output)
   local found_outblock = false
   local newdoc = self.doc:walk{
     CodeBlock = function (cb)
       if BlockProperty.is_output(cb) then
         found_outblock = true
-        cb.text = write(expected_output, cb.attr)
+        cb.text = expected_output
         return cb
       end
     end,
@@ -240,8 +240,7 @@ function Perevirka:update_expected (expected_output, write)
   if found_outblock then
     self.doc = newdoc
   else
-    local docstring = write(expected_output)
-    self.doc.blocks:insert(pandoc.CodeBlock(docstring, {'expected'}))
+    self.doc.blocks:insert(pandoc.CodeBlock(expected_output, {'expected'}))
   end
 end
 
@@ -455,9 +454,8 @@ end
 
 --- Accept the actual document as correct and rewrite the test file.
 function TestRunner:accept (test, actual)
-  local write = self:get_writer(test.target_format)
   local perevirka = Perevirka.new(test.filepath, test.doc)
-  perevirka:update_expected(actual, write)
+  perevirka:update_expected(actual)
   perevirka:write()
 end
 
@@ -546,7 +544,10 @@ function TestRunner:run_string_test (test, accept)
 end
 
 function TestRunner:get_expected_and_actual (test)
-  local expected = self:get_expected_doc(test)
+  local ok, expected = pcall(self.get_expected_doc, self, test)
+  if not ok then
+    expected = false
+  end
   local actual   = self:get_actual_doc(test)
   local modifier_filters = List{}
   if test.options['ignore-softbreaks'] then
@@ -570,16 +571,19 @@ TestRunner.run_test = function (self, test, accept)
   io.stdout:write(':' .. string.rep(' ', math.max(1, 55 - #test.filepath)))
   local result = nil
   local expected, actual, expected_str, actual_str
+  local accept_str
   if test.options.disable then
     -- An ignored test is neither true nor false
     result = nil
   elseif test.command then
     expected_str, actual_str = self:run_command_test(test)
     result = expected_str == actual_str
+    accept_str = actual_str
   elseif test.options.compare and
-         utils.stringify(test.options.compare) == 'strings' then
+    utils.stringify(test.options.compare) == 'strings' then
     expected_str, actual_str = self:run_string_test(test, accept)
     result = expected_str == actual_str
+    accept_str = actual_str
   else
     expected, actual = self:get_expected_and_actual(test)
     result = actual == expected
@@ -594,6 +598,10 @@ TestRunner.run_test = function (self, test, accept)
       expected_str = expected
         and pandoc.write(expected, 'native', opts)
         or actual_str
+
+      -- The string for accept is different than the error reporting string.
+      local write = self:get_writer(test.target_format)
+      accept_str = write(actual)
     end
   end
 
@@ -603,7 +611,7 @@ TestRunner.run_test = function (self, test, accept)
     -- Disabled test
     io.stdout:write('DISABLED\n')
   elseif accept then
-    self:accept(test, actual)
+    self:accept(test, accept_str)
     io.stdout:write('ACCEPTED\n')
   else
     io.stdout:write('FAILED\n')
