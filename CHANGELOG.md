@@ -4,6 +4,15 @@ Perevir is versioned using [Semantic Versioning][].
 
 [Semantic Versioning]: https://semver.org/
 
+## v0.4.1
+
+Released 2024-10-06.
+
+- The TestRunner is now more configurable, allowing to easily set
+  custom readers and writers for specific formats.
+
+- Moved repository to Codeberg.
+
 ## v0.4.0
 
 Released 2024-09-02.
