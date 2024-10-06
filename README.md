@@ -12,6 +12,11 @@ or Codeberg.
 The name *perevir* is the transliteration of the Ukrainian word
 перевір, "check (something)!"
 
+A mirror of this repository is available on
+[GitHub](https://github.com/tarleb/perevir), but the version
+there may lag behind at times. Main development happens here on
+Codeberg.
+
 Motivation
 ----------
 
