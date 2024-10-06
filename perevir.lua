@@ -536,10 +536,10 @@ end
 
 --- Run a test, but compare the string output instead of the documents.
 function TestRunner:run_string_test (test, accept)
-  local format, exts = test.target_format, test.target_extensions
+  local format = test.target_format
   local expected = accept or test.output.text
   local write = self:get_writer(format)
-  local actual = write(self:get_actual_doc(test))
+  local actual = write(self:get_actual_doc(test), test.output.attr)
   return expected, actual
 end
 
